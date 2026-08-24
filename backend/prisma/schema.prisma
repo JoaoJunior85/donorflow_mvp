@@ -1,0 +1,274 @@
+ generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  donor
+  recipient
+  admin
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum ProjectStatus {
+  draft
+  active
+  completed
+  cancelled
+}
+
+enum WalletStatus {
+  active
+  frozen
+  closed
+}
+
+enum SubWalletStatus {
+  active
+  frozen
+  closed
+}
+
+enum PaymentRequestStatus {
+  pending
+  approved
+  rejected
+  frozen
+  completed
+}
+
+enum TransactionType {
+  payment
+  refund
+  adjustment
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+}
+
+enum LedgerEntryType {
+  credit
+  debit
+  freeze
+  unfreeze
+  adjustment
+}
+
+enum ApprovalDecision {
+  approved
+  rejected
+  frozen
+  needs_more_information
+}
+
+model User {
+  id           String   @id @default(uuid())
+  fullName     String   @map("full_name")
+  email        String   @unique
+  phone        String?
+  passwordHash String   @map("password_hash")
+  role         String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  donorProjects     Project[]        @relation("DonorProjects")
+  recipientProjects Project[]        @relation("RecipientProjects")
+  walletsAsDonor    Wallet[]         @relation("WalletDonor")
+  walletsAsRecipient Wallet[]        @relation("WalletRecipient")
+  paymentRequests   PaymentRequest[] @relation("RequestedBy")
+  approvals         Approval[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Organization {
+  id                 String             @id @default(uuid())
+  name               String
+  type               String
+  registrationNumber String?            @map("registration_number")
+  email              String?
+  phone              String?
+  verificationStatus String @default("pending") @map("verification_status")
+  createdAt          DateTime           @default(now()) @map("created_at")
+
+  @@map("organizations")
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  title       String
+  description String?
+  donorId     String        @map("donor_id")
+  recipientId String?       @map("recipient_id")
+  totalBudget Decimal       @map("total_budget") @db.Decimal(14, 2)
+  status      String        @default("draft")
+  startDate   DateTime?     @map("start_date")
+  endDate     DateTime?     @map("end_date")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  donor            User             @relation("DonorProjects", fields: [donorId], references: [id])
+  recipient        User?            @relation("RecipientProjects", fields: [recipientId], references: [id])
+  wallet           Wallet?
+  paymentRequests  PaymentRequest[]
+  transactions     Transaction[]
+
+  @@map("projects")
+}
+
+model Wallet {
+  id          String       @id @default(uuid())
+  projectId   String       @unique @map("project_id")
+  donorId     String       @map("donor_id")
+  recipientId String?      @map("recipient_id")
+  currency    String       @default("MZN")
+  status      String       @default("active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  donor       User         @relation("WalletDonor", fields: [donorId], references: [id])
+  recipient   User?        @relation("WalletRecipient", fields: [recipientId], references: [id])
+  subWallets  SubWallet[]
+  ledgerEntries LedgerEntry[]
+
+  @@map("wallets")
+}
+
+model SubWallet {
+  id              String          @id @default(uuid())
+  walletId        String          @map("wallet_id")
+  name            String
+  purpose         String
+  allocatedAmount Decimal         @map("allocated_amount") @db.Decimal(14, 2)
+  approvalLimit   Decimal?        @map("approval_limit") @db.Decimal(14, 2)
+  status          String          @default("active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  wallet          Wallet           @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  paymentRequests PaymentRequest[]
+  transactions    Transaction[]
+  ledgerEntries   LedgerEntry[]
+
+  @@map("sub_wallets")
+}
+
+model Payee {
+  id                   String             @id @default(uuid())
+  name                 String
+  type                 String
+  phone                String?
+  email                String?
+  bankName             String?            @map("bank_name")
+  bankAccountNumber    String?            @map("bank_account_number")
+  mobileMoneyProvider  String?            @map("mobile_money_provider")
+  mobileMoneyNumber    String?            @map("mobile_money_number")
+  verificationStatus   String             @default("pending") @map("verification_status")
+  createdAt            DateTime           @default(now()) @map("created_at")
+
+  paymentRequests PaymentRequest[]
+  transactions    Transaction[]
+
+  @@map("payees")
+}
+
+model PaymentRequest {
+  id          String               @id @default(uuid())
+  projectId   String               @map("project_id")
+  subWalletId String               @map("sub_wallet_id")
+  requestedBy String               @map("requested_by")
+  payeeId     String               @map("payee_id")
+  amount      Decimal              @db.Decimal(14, 2)
+  purpose     String
+  description String?
+  invoiceUrl  String?              @map("invoice_url")
+  status      String               @default("pending")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  project     Project      @relation(fields: [projectId], references: [id])
+  subWallet   SubWallet    @relation(fields: [subWalletId], references: [id])
+  requester   User         @relation("RequestedBy", fields: [requestedBy], references: [id])
+  payee       Payee        @relation(fields: [payeeId], references: [id])
+  approvals   Approval[]
+  transaction Transaction?
+
+  @@map("payment_requests")
+}
+
+model Transaction {
+  id               String            @id @default(uuid())
+  paymentRequestId String            @unique @map("payment_request_id")
+  projectId        String            @map("project_id")
+  subWalletId      String            @map("sub_wallet_id")
+  payeeId          String            @map("payee_id")
+  amount           Decimal           @db.Decimal(14, 2)
+  transactionType  String            @default("payment") @map("transaction_type")
+  status           String            @default("completed")
+  referenceNumber  String            @unique @map("reference_number")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId], references: [id])
+  project        Project        @relation(fields: [projectId], references: [id])
+  subWallet      SubWallet      @relation(fields: [subWalletId], references: [id])
+  payee          Payee          @relation(fields: [payeeId], references: [id])
+  ledgerEntries  LedgerEntry[]
+
+  @@map("transactions")
+}
+
+model LedgerEntry {
+  id            String          @id @default(uuid())
+  transactionId String?         @map("transaction_id")
+  walletId      String          @map("wallet_id")
+  subWalletId   String?         @map("sub_wallet_id")
+  entryType     String          @map("entry_type")
+  amount        Decimal         @db.Decimal(14, 2)
+  currency      String          @default("MZN")
+  description   String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+  wallet      Wallet       @relation(fields: [walletId], references: [id])
+  subWallet   SubWallet?   @relation(fields: [subWalletId], references: [id])
+
+  @@map("ledger_entries")
+}
+
+model Approval {
+  id               String           @id @default(uuid())
+  paymentRequestId String           @map("payment_request_id")
+  approverId       String           @map("approver_id")
+  decision         ApprovalDecision
+  comment          String?
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId], references: [id])
+  approver       User           @relation(fields: [approverId], references: [id])
+
+  @@map("approvals")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
