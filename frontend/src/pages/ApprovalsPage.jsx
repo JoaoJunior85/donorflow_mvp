@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, formatCurrency } from '../services/api';
-import { DataTable, StatusBadge } from '../components/UI';
+import { DataTable, StatusBadge, SuccessBanner } from '../components/UI';
 
 export default function ApprovalsPage() {
   const [requests, setRequests] = useState([]);
   const [selected, setSelected] = useState(null);
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const load = () =>
@@ -32,11 +33,14 @@ export default function ApprovalsPage() {
     if (!selected) return;
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
       await api.approvePaymentRequest(selected.id, { decision, comment });
       setSelected(null);
+      setSuccess(`Payment request ${decision}.`);
       const all = await api.getPaymentRequests();
       setRequests(all.filter((r) => ['pending', 'frozen'].includes(r.status)));
+      window.dispatchEvent(new CustomEvent('donorflow:refresh-dashboard'));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -50,6 +54,7 @@ export default function ApprovalsPage() {
       <p className="text-slate-500 mb-8">Review, approve, reject, or freeze payment requests</p>
 
       {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
+      {success && <SuccessBanner title="Approved" message={success} onClose={() => setSuccess('')} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>

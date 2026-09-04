@@ -84,11 +84,37 @@ export async function fundProject(projectId, donorId, amount) {
 export async function createSubWallet(projectId, donorId, data) {
   const project = await prisma.project.findFirst({
     where: { id: projectId, donorId },
-    include: { wallet: true },
+    include: {
+      wallet: {
+        include: { subWallets: true },
+      },
+    },
   });
 
   if (!project?.wallet) {
     const err = new Error('Project wallet not found — fund the project first');
+    err.status = 400;
+    throw err;
+  }
+
+  const fundedAmount = Number(
+    (await prisma.ledgerEntry.aggregate({
+      where: { walletId: project.wallet.id, entryType: 'credit', subWalletId: null },
+      _sum: { amount: true },
+    }))._sum.amount ?? 0
+  );
+
+  const existingAllocation = project.wallet.subWallets.reduce(
+    (sum, sw) => sum + Number(sw.allocatedAmount),
+    0
+  );
+  const requestedAllocation = Number(data.allocatedAmount);
+  const availableBalance = Math.max(0, fundedAmount - existingAllocation);
+
+  if (requestedAllocation > availableBalance) {
+    const err = new Error(
+      `Sub-wallet allocation exceeds available project wallet balance. Available: ${availableBalance.toFixed(2)}. Requested total allocation: ${requestedAllocation.toFixed(2)}.`
+    );
     err.status = 400;
     throw err;
   }

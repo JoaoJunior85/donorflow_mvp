@@ -1,121 +1,232 @@
-# DonorFlow MVP
+# DonorFlow
 
-**Purpose-bound fintech accountability platform** — track donor funds from allocation through approval to payee, with a simulated internal ledger (no real money movement in MVP).
+DonorFlow is a purpose-bound fintech accountability demo for tracking donor funding, project allocations, sub-wallet spending, and approval workflows in a controlled MVP environment.
 
-## Accountability chain
+## What this app does
 
-```
-Donor → Project → Sub-Wallet → Payment Request → Approval → Payee → Report
-```
+- Donor creates a project and funds a wallet
+- Recipient is assigned to the project and submits payment requests
+- Donor approves, rejects, or freezes requests
+- Admin verifies payees and vendors
+- Dashboards and reports update from the internal transaction ledger
+- The app simulates funding movement without real banking operations
+
+## System flow
+
+Donor → Project → Wallet → Sub-wallet → Payment Request → Approval → Transaction → Ledger
 
 ## Tech stack
 
-| Layer    | Technology              |
-|----------|-------------------------|
-| Frontend | React + Vite + Tailwind |
-| Backend  | Node.js + Express       |
-| Database | PostgreSQL + Prisma   |
-| Charts   | Recharts                |
+- Frontend: React + Vite
+- Backend: Node.js + Express
+- Database: PostgreSQL + Prisma
+- Charts: Recharts
 
-## Project structure
+## Repository structure
 
-```
+```text
 DonorFlow/
-├── backend/          # Express API, Prisma, business logic
-│   ├── prisma/       # Schema, migrations, seed
-│   └── src/
-│       ├── routes/
-│       ├── services/
-│       └── middleware/
-└── frontend/         # React dashboard (donor, recipient, admin)
+├── backend/
+│   ├── prisma/
+│   ├── src/
+│   ├── .env
+│   ├── .env.example
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   └── package.json
+├── docs/
+│   ├── FILE_DESCRIPTIONS.md
+│   └── donorflow_system_designPDF.pdf
+├── README.md
+└── package-lock.json
 ```
 
-## Quick start
+## Local setup
 
-### 1. Database
+### 1) Install dependencies
 
-Create a PostgreSQL database (local or [Supabase](https://supabase.com)) and copy env:
-
-```bash
-cd backend
-cp .env.example .env
-# Edit DATABASE_URL and JWT_SECRET
-```
-
-### 2. Backend
+Backend:
 
 ```bash
 cd backend
 npm install
-npx prisma generate
-npx prisma db push
-npm run db:seed
-npm run dev
 ```
 
-API runs at **http://localhost:5000**
-
-### 3. Frontend
+Frontend:
 
 ```bash
 cd frontend
 npm install
+```
+
+### 2) Configure environment
+
+Use the `.env.example` file in `backend` as a starting point and create a `.env` with your local database connection and JWT secret.
+
+Example:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/donorflow"
+JWT_SECRET="change-this-secret"
+PORT=5000
+FRONTEND_URL="http://localhost:5173"
+```
+
+### 3) Initialize the database
+
+```bash
+cd backend
+npx prisma generate
+npx prisma db push
+npm run db:seed
+```
+
+### 4) Run the app
+
+Backend:
+
+```bash
+cd backend
 npm run dev
 ```
 
-App runs at **http://localhost:5173**
+Frontend:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Frontend URL: http://localhost:5173
+Backend URL: http://localhost:5000
+
+## Production readiness checklist
+
+This repository is an MVP demo and is not a live banking system. Before hosting it publicly:
+
+- Use separate production hosting for the frontend, API, and PostgreSQL database, with HTTPS enabled.
+- Set `NODE_ENV=production`, a strong unique `JWT_SECRET`, the production `DATABASE_URL`, and the exact frontend URL in `FRONTEND_URL`. Multiple allowed frontend origins may be separated by commas.
+- Set frontend `VITE_API_URL` to the public API base URL, including `/api` (for example, `https://api.example.com/api`). A relative `/api` works only when the host reverse-proxies `/api` to the backend.
+- Configure the frontend host to serve `frontend/dist/index.html` for unknown routes so direct visits to `/dashboard` and other React routes do not return 404.
+- Run database migrations against a backup, then verify `/api/health` and `/api/health/db`. Do not run the seed script against a production database.
+- Replace all demo credentials, review authorization and rate limiting, and do not expose Prisma Studio or PostgreSQL publicly.
+- Test the hosted app at mobile widths, desktop widths, login, refresh on a nested route, API failures, logout, and each role before announcing it.
+
+The backend now refuses to start in production with missing configuration or the example JWT secret. That prevents an incomplete deployment from appearing healthy while authentication is unsafe.
 
 ## Demo accounts
 
-| Role      | Email                    | Password    |
-|-----------|--------------------------|-------------|
-| Donor     | donor@donorflow.demo     | password123 |
-| Recipient | recipient@donorflow.demo | password123 |
-| Admin     | admin@donorflow.demo     | password123 |
+These are the working accounts created by the seed script.
 
-## Demo scenario
+| Role | Name | Email | Password |
+|------|------|-------|----------|
+| Admin | System Admin | admin@donorflow.demo | password123 |
+| Donor | Martha Phiri | martha.phiri@donorflow.demo | password123 |
+| Recipient | Daniel Mwansa | daniel.mwansa@donorflow.demo | password123 |
 
-1. **Donor** logs in — sees K100,000 Digital Skills Training project with 5 sub-wallets.
-2. **Recipient** sees pending K8,000 request to ABC Printers (Training Materials).
-3. **Donor** opens **Approvals**, reviews invoice/details, **Approves**.
-4. System creates transaction + debit ledger entry; Training Materials balance drops to K22,000.
-5. **Reports** and dashboards update automatically.
+## Current presentation dataset
 
-## MVP features implemented
+The seed creates a realistic project called:
 
-- User registration/login (donor, recipient, admin)
-- Project creation and simulated funding
-- Purpose-based sub-wallets with approval limits
-- Payee/vendor recording and admin verification
-- Payment requests with rule engine (balance, limits, verification, invoice, purpose)
-- Donor approve / reject / freeze
-- Transactions + ledger entries (credit/debit)
-- Donor, recipient, and admin dashboards
-- Reports with Recharts
-- Audit logs
+- Rural Health and Nutrition Program
 
-## API overview
+With these key sub-wallets:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Register user |
-| POST | `/api/auth/login` | Login |
-| GET | `/api/projects` | List projects |
-| POST | `/api/projects/:id/fund` | Simulate funding |
-| POST | `/api/projects/:id/sub-wallets` | Create sub-wallet |
-| POST | `/api/payments/requests` | Submit payment request |
-| POST | `/api/payments/requests/:id/approve` | Approve/reject/freeze |
-| GET | `/api/reports/dashboard` | Role-based dashboard |
-| GET | `/api/reports/projects/:id` | Project report |
+| Sub-wallet | Purpose | Allocation |
+|------------|---------|------------|
+| Community Screenings | Health screenings | ZMW 35,000 |
+| Nutrition Support | Food and nutrition assistance | ZMW 30,000 |
+| Field Transport | Travel and logistics | ZMW 25,000 |
+| Community Outreach | Awareness sessions | ZMW 20,000 |
 
-## Deployment (recommended)
+The project is funded at ZMW 150,000 and is ready for donor approval and recipient payment requests.
 
-- **Frontend:** Vercel
-- **Backend:** Render or Railway
-- **Database:** Supabase PostgreSQL
+## Recommended presentation flow
 
-Set `VITE_API_URL` on the frontend to your deployed API URL.
+1. Log in as the donor using `martha.phiri@donorflow.demo`
+2. Open the project and review the wallet and sub-wallet balances
+3. Log in as the recipient using `daniel.mwansa@donorflow.demo`
+4. Create payees and verify them as admin
+5. Submit payment requests from the correct sub-wallet
+6. Log back in as donor and approve pending requests from Approvals
+7. Check the dashboard and transaction history for the updated balances
 
-## Out of scope (post-MVP)
+## Important rules for the demo
 
-Real bank/mobile money integration, KYC automation, AI fraud detection, blockchain, push notifications.
+- Payees must be `verified` before a payment request can be used realistically
+- The request amount must stay within the selected sub-wallet balance
+- Payment purpose should match the sub-wallet purpose closely
+- Donor approval is required to complete a payment request
+
+## API health checks
+
+These endpoints are useful for validation before a public test:
+
+```bash
+curl http://localhost:5000/api/health
+curl http://localhost:5000/api/health/db
+```
+
+Expected output: status `ok` and database connected.
+
+## Useful commands
+
+Reset seed and rebuild demo data:
+
+```bash
+cd backend
+npm run db:push
+npm run db:seed
+```
+
+Verify database health:
+
+```bash
+cd backend
+npm run db:check
+```
+
+Build frontend:
+
+```bash
+cd frontend
+npm run build
+```
+
+## Known good workflow for public testing
+
+Before presenting the app:
+
+1. Start backend
+2. Start frontend
+3. Confirm API health endpoints return OK
+4. Seed the database fresh if the app has stale demo data
+5. Log in using the demo accounts above
+6. Avoid changing schema or seed logic at the last minute
+
+## Troubleshooting
+
+If the app looks wrong or data seems stale:
+
+```bash
+cd backend
+npm run db:push
+npm run db:seed
+```
+
+If login or project data fails:
+
+- confirm PostgreSQL is running
+- confirm `.env` contains a valid `DATABASE_URL`
+- confirm `JWT_SECRET` exists
+- confirm backend server started on port 5000
+
+## Notes
+
+- This is an MVP demo, not a live banking system
+- No real funds move between accounts
+- The ledger is an internal simulation used for accountability and reporting
+
+For file-level implementation notes, see [docs/FILE_DESCRIPTIONS.md](docs/FILE_DESCRIPTIONS.md).

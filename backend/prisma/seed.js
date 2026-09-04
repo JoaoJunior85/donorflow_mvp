@@ -3,187 +3,240 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function findOrCreateUser(data) {
-  const existing = await prisma.user.findFirst({ where: { email: data.email } });
-  if (existing) return existing;
-  return prisma.user.create({ data });
+async function resetDatabase() {
+  console.log('Cleaning existing database data...');
+
+  await prisma.auditLog.deleteMany({});
+  await prisma.approval.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.ledgerEntry.deleteMany({});
+  await prisma.paymentRequest.deleteMany({});
+  await prisma.subWallet.deleteMany({});
+  await prisma.wallet.deleteMany({});
+  await prisma.project.deleteMany({});
+  await prisma.payee.deleteMany({});
+  await prisma.organization.deleteMany({});
+  await prisma.user.deleteMany({});
 }
 
 async function main() {
-  console.log('Seeding DonorFlow demo data...');
+  await resetDatabase();
 
   const passwordHash = await bcrypt.hash('password123', 10);
 
-  const donor = await findOrCreateUser({
-      fullName: 'Grace Mwanza',
-      email: 'donor@donorflow.demo',
-      phone: '+260971000001',
-      passwordHash,
-      role: 'donor',
-  });
-
-  const recipient = await findOrCreateUser({
-      fullName: 'James Banda',
-      email: 'recipient@donorflow.demo',
-      phone: '+260972000002',
-      passwordHash,
-      role: 'recipient',
-  });
-
-  const admin = await findOrCreateUser({
+  const admin = await prisma.user.create({
+    data: {
       fullName: 'System Admin',
       email: 'admin@donorflow.demo',
       phone: '+260973000003',
       passwordHash,
       role: 'admin',
+    },
   });
 
-  let payee = await prisma.payee.findFirst({ where: { name: 'ABC Printers' } });
-  if (!payee) {
-    payee = await prisma.payee.create({
-      data: {
-      name: 'ABC Printers',
-      type: 'vendor',
-      phone: '+260974000004',
-      email: 'info@abcprinters.co.zm',
-      bankName: 'Zanaco',
-      bankAccountNumber: '1234567890',
-      verificationStatus: 'verified',
-      },
-    });
-  }
+  const donor = await prisma.user.create({
+    data: {
+      fullName: 'Martha Phiri',
+      email: 'martha.phiri@donorflow.demo',
+      phone: '+260977100001',
+      passwordHash,
+      role: 'donor',
+    },
+  });
 
-  const venuePayee = await prisma.payee.findFirst({ where: { name: 'Lusaka Venue Hub' } });
-  if (!venuePayee) {
-    await prisma.payee.create({
+  const recipient = await prisma.user.create({
+    data: {
+      fullName: 'Daniel Mwansa',
+      email: 'daniel.mwansa@donorflow.demo',
+      phone: '+260977100002',
+      passwordHash,
+      role: 'recipient',
+    },
+  });
+
+  const payees = await Promise.all([
+    prisma.payee.create({
       data: {
-        name: 'Lusaka Venue Hub',
+        name: 'Lusaka Conference Centre',
         type: 'vendor',
-        phone: '+260975000005',
+        phone: '+260977100003',
+        email: 'accounts@lcc.co.zm',
         verificationStatus: 'verified',
       },
-    });
-  }
-
-  const organization = await prisma.organization.findFirst({
-    where: { name: 'Youth Empowerment Foundation' },
-  });
-  if (!organization) {
-    await prisma.organization.create({
+    }),
+    prisma.payee.create({
       data: {
-        name: 'Youth Empowerment Foundation',
-        type: 'NGO',
-        registrationNumber: 'NGO/2024/001',
-        email: 'contact@yef.org.zm',
+        name: 'Chikondi Catering Services',
+        type: 'vendor',
+        phone: '+260977100004',
+        email: 'hello@chikondicatering.co.zm',
         verificationStatus: 'verified',
       },
-    });
-  }
+    }),
+    prisma.payee.create({
+      data: {
+        name: 'Mulenga Transport Services',
+        type: 'vendor',
+        phone: '+260977100005',
+        email: 'bookings@mulengatransport.co.zm',
+        verificationStatus: 'verified',
+      },
+    }),
+  ]);
 
-  let project = await prisma.project.findFirst({
-    where: { title: 'Digital Skills Training Programme' },
+  const project = await prisma.project.create({
+    data: {
+      title: 'Lusaka Community Health Outreach',
+      description:
+        'A community health outreach programme providing maternal health education, screenings, and referrals for families in Lusaka.',
+      donorId: donor.id,
+      recipientId: recipient.id,
+      totalBudget: 150000,
+      status: 'active',
+      startDate: new Date('2026-08-01'),
+      endDate: new Date('2026-10-31'),
+    },
   });
 
-  if (!project) {
-    project = await prisma.project.create({
-      data: {
-        title: 'Digital Skills Training Programme',
-        description:
-          'A 6-week digital literacy programme for 50 youth in Lusaka, covering basic computing, online safety, and job-ready skills.',
-        donorId: donor.id,
-        recipientId: recipient.id,
-        totalBudget: 100000,
-        status: 'active',
-        startDate: new Date('2026-07-01'),
-        endDate: new Date('2026-08-31'),
-      },
-    });
-  }
+  const wallet = await prisma.wallet.create({
+    data: {
+      projectId: project.id,
+      donorId: donor.id,
+      recipientId: recipient.id,
+      currency: 'ZMW',
+      status: 'active',
+    },
+  });
 
-  let wallet = await prisma.wallet.findUnique({ where: { projectId: project.id } });
+  await prisma.ledgerEntry.create({
+    data: {
+      walletId: wallet.id,
+      entryType: 'credit',
+      amount: 150000,
+      currency: 'ZMW',
+      description: 'Initial funding — Lusaka Community Health Outreach',
+    },
+  });
 
-  if (!wallet) {
-    wallet = await prisma.wallet.create({
-      data: {
-        projectId: project.id,
-        donorId: donor.id,
-        recipientId: recipient.id,
-        currency: 'MZN',
-      },
-    });
-
-    await prisma.ledgerEntry.create({
+  const subWallets = await Promise.all([
+    prisma.subWallet.create({
       data: {
         walletId: wallet.id,
-        entryType: 'credit',
-        amount: 100000,
-        currency: 'MZN',
-        description: 'Initial project funding — Digital Skills Training',
+        name: 'Community Screenings',
+        purpose: 'Health screenings',
+        allocatedAmount: 35000,
+        approvalLimit: 10000,
+        status: 'active',
       },
-    });
-  }
+    }),
+    prisma.subWallet.create({
+      data: {
+        walletId: wallet.id,
+        name: 'Medical Supplies',
+        purpose: 'Medical supplies',
+        allocatedAmount: 40000,
+        approvalLimit: 12000,
+        status: 'active',
+      },
+    }),
+    prisma.subWallet.create({
+      data: {
+        walletId: wallet.id,
+        name: 'Field Transport',
+        purpose: 'Transport',
+        allocatedAmount: 20000,
+        approvalLimit: 5000,
+        status: 'active',
+      },
+    }),
+  ]);
 
-  const subWalletDefs = [
-    { name: 'Venue Wallet', purpose: 'Venue', allocatedAmount: 20000, approvalLimit: 5000 },
-    { name: 'Training Materials', purpose: 'Training Materials', allocatedAmount: 30000, approvalLimit: 8000 },
-    { name: 'Facilitators', purpose: 'Labour', allocatedAmount: 25000, approvalLimit: 10000 },
-    { name: 'Meals', purpose: 'Meals', allocatedAmount: 15000, approvalLimit: 3000 },
-    { name: 'Transport', purpose: 'Transport', allocatedAmount: 10000, approvalLimit: 2000 },
-  ];
-
-  const existingSubWallets = await prisma.subWallet.count({ where: { walletId: wallet.id } });
-
-  if (existingSubWallets === 0) {
-    for (const sw of subWalletDefs) {
-      await prisma.subWallet.create({
-        data: { walletId: wallet.id, ...sw },
-      });
-    }
-  }
-
-  const trainingMaterials = await prisma.subWallet.findFirst({
-    where: { walletId: wallet.id, name: 'Training Materials' },
+  const pendingRequest = await prisma.paymentRequest.create({
+    data: {
+      projectId: project.id,
+      subWalletId: subWallets[0].id,
+      requestedBy: recipient.id,
+      payeeId: payees[0].id,
+      amount: 8500,
+      purpose: 'Community screening venue hire',
+      description: 'Venue hire for the next community screening day in Lusaka.',
+      status: 'pending',
+    },
   });
 
-  const existingRequest = await prisma.paymentRequest.findFirst({
-    where: { projectId: project.id, purpose: { contains: 'training manuals' } },
+  await prisma.auditLog.create({
+    data: {
+      userId: recipient.id,
+      action: 'Payment request submitted',
+      entityType: 'payment_request',
+      entityId: pendingRequest.id,
+      newValue: { amount: 8500, purpose: 'Community screening venue hire' },
+    },
   });
 
-  if (!existingRequest && trainingMaterials) {
-    const paymentRequest = await prisma.paymentRequest.create({
-      data: {
-        projectId: project.id,
-        subWalletId: trainingMaterials.id,
-        requestedBy: recipient.id,
-        payeeId: payee.id,
-        amount: 8000,
-        purpose: 'Payment for training manuals',
-        description: 'Printing 50 copies of digital skills training manuals for programme participants.',
-        status: 'pending',
-      },
-    });
+  const completedRequest = await prisma.paymentRequest.create({
+    data: {
+      projectId: project.id,
+      subWalletId: subWallets[1].id,
+      requestedBy: recipient.id,
+      payeeId: payees[1].id,
+      amount: 12000,
+      purpose: 'Community health screening kits',
+      description: 'Approved purchase of screening kits for the outreach teams.',
+      status: 'completed',
+    },
+  });
 
-    await prisma.auditLog.create({
-      data: {
-        userId: recipient.id,
-        action: 'Payment request submitted',
-        entityType: 'payment_request',
-        entityId: paymentRequest.id,
-        newValue: { amount: 8000, purpose: 'training manuals' },
-      },
-    });
-  }
+  const completedTransaction = await prisma.transaction.create({
+    data: {
+      paymentRequestId: completedRequest.id,
+      projectId: project.id,
+      subWalletId: subWallets[1].id,
+      payeeId: payees[1].id,
+      amount: 12000,
+      transactionType: 'payment',
+      status: 'completed',
+      referenceNumber: 'DF-LCHO-0001',
+    },
+  });
 
-  console.log('\nDemo accounts (password: password123):');
-  console.log('  Donor:     donor@donorflow.demo');
-  console.log('  Recipient: recipient@donorflow.demo');
-  console.log('  Admin:     admin@donorflow.demo');
-  console.log('\nSeed complete.');
+  await prisma.ledgerEntry.create({
+    data: {
+      transactionId: completedTransaction.id,
+      walletId: wallet.id,
+      subWalletId: subWallets[1].id,
+      entryType: 'debit',
+      amount: 12000,
+      currency: 'ZMW',
+      description: 'Payment to Chikondi Catering Services: Community health screening kits',
+    },
+  });
+
+  await prisma.approval.create({
+    data: {
+      paymentRequestId: completedRequest.id,
+      approverId: donor.id,
+      decision: 'approved',
+      comment: 'Approved for the community health outreach programme.',
+    },
+  });
+
+  console.log('\nFinal dataset is clean and focused on a single realistic project.');
+  console.log('Project:', project.title);
+  console.log('Donor:', donor.fullName, donor.email);
+  console.log('Recipient:', recipient.fullName, recipient.email);
+  console.log('Currency:', wallet.currency);
+  console.log('Sub-wallets:', subWallets.map((item) => item.name).join(', '));
+  console.log('Pending request:', pendingRequest.purpose, 'ZMW', pendingRequest.amount.toString());
+  console.log('\nLogin details (password: password123):');
+  console.log('Admin:', admin.email);
+  console.log('Donor:', donor.email);
+  console.log('Recipient:', recipient.email);
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((error) => {
+    console.error('Seeding failed:', error);
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());

@@ -59,7 +59,7 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+          <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm sm:p-6 mb-8">
             <h2 className="font-semibold mb-4">Sub-Wallet Spending</h2>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={report.subWalletReports}>
@@ -67,8 +67,8 @@ export default function ReportsPage() {
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={(v) => `K${v / 1000}k`} />
                 <Tooltip formatter={(v) => formatCurrency(v)} />
-                <Bar dataKey="spent" fill="#3b82f6" name="Spent" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="remaining" fill="#10b981" name="Remaining" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="spent" fill="#092d43" name="Spent" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="remaining" fill="#19b975" name="Remaining" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

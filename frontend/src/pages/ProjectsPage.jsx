@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, formatCurrency } from '../services/api';
-import { DataTable, StatusBadge } from '../components/UI';
+import { DataTable, StatusBadge, SuccessBanner } from '../components/UI';
 
 export default function ProjectsPage() {
   const { user } = useAuth();
@@ -18,6 +18,7 @@ export default function ProjectsPage() {
     endDate: '',
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const load = () => api.getProjects().then(setProjects).catch((e) => setError(e.message));
 
@@ -30,6 +31,8 @@ export default function ProjectsPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
     try {
       await api.createProject({
         ...form,
@@ -38,11 +41,14 @@ export default function ProjectsPage() {
       });
       setShowForm(false);
       setForm({ title: '', description: '', totalBudget: '', recipientId: '', startDate: '', endDate: '' });
+      setSuccess('Project successfully created.');
       load();
     } catch (err) {
       setError(err.message);
     }
   };
+
+  const featuredProject = projects[0] ?? null;
 
   return (
     <div>
@@ -62,15 +68,22 @@ export default function ProjectsPage() {
       </div>
 
       {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
+      {success && <SuccessBanner title="Success" message={success} onClose={() => setSuccess('')} />}
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-sm p-6 mb-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleCreate} className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-brand-900">Create Project</h2>
+              <p className="text-sm text-slate-500">Add a new funding initiative and define its delivery scope.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <input
               placeholder="Project title"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="px-4 py-2 border rounded-lg"
+              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
               required
             />
             <input
@@ -78,20 +91,20 @@ export default function ProjectsPage() {
               type="number"
               value={form.totalBudget}
               onChange={(e) => setForm({ ...form, totalBudget: e.target.value })}
-              className="px-4 py-2 border rounded-lg"
+              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
               required
             />
             <textarea
               placeholder="Description"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="px-4 py-2 border rounded-lg md:col-span-2"
-              rows={2}
+              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white md:col-span-2"
+              rows={3}
             />
             <select
               value={form.recipientId}
               onChange={(e) => setForm({ ...form, recipientId: e.target.value })}
-              className="px-4 py-2 border rounded-lg"
+              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
             >
               <option value="">Select recipient (optional)</option>
               {recipients.map((r) => (
@@ -101,10 +114,43 @@ export default function ProjectsPage() {
               ))}
             </select>
           </div>
-          <button type="submit" className="bg-brand-600 text-white px-6 py-2 rounded-lg text-sm font-medium">
-            Create Project
-          </button>
+          <div className="mt-5 flex justify-end">
+            <button type="submit" className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700">
+              Create Project
+            </button>
+          </div>
         </form>
+      )}
+
+      {featuredProject && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Project details</p>
+              <h2 className="mt-2 text-2xl font-bold text-slate-900">{featuredProject.title}</h2>
+            </div>
+            <StatusBadge status={featuredProject.status} />
+          </div>
+
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            {featuredProject.description || 'No description added for this project yet.'}
+          </p>
+
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Budget</div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">{formatCurrency(featuredProject.totalBudget)}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Recipient</div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">{featuredProject.recipient?.fullName ?? '—'}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Funded</div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">{formatCurrency(featuredProject.wallet?.totals?.funded ?? 0)}</div>
+            </div>
+          </div>
+        </div>
       )}
 
       <DataTable

@@ -32,10 +32,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-900 to-brand-700 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_right,#1dbd7a_0,#092d43_42%,#061c2b_100%)] p-4 sm:p-6">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-9">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-brand-900">Create account</h1>
+          <div className="brand-logo auth-logo mx-auto mb-4"><img src="/images/donorflow_badge_clean.png" alt="DonorFlow" /></div>
+          <h1 className="text-2xl font-bold text-brand-900">Create your account</h1>
           <p className="text-slate-500 mt-1">Join DonorFlow</p>
         </div>
 
@@ -50,7 +51,7 @@ export default function RegisterPage() {
               name="fullName"
               value={form.fullName}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-500 outline-none"
               required
             />
           </div>
@@ -61,7 +62,7 @@ export default function RegisterPage() {
               type="email"
               value={form.email}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-500 outline-none"
               required
             />
           </div>
@@ -71,7 +72,7 @@ export default function RegisterPage() {
               name="phone"
               value={form.phone}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-500 outline-none"
             />
           </div>
           <div>
@@ -80,7 +81,7 @@ export default function RegisterPage() {
               name="role"
               value={form.role}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-500 outline-none"
             >
               <option value="donor">Donor</option>
               <option value="recipient">Recipient</option>
@@ -94,7 +95,7 @@ export default function RegisterPage() {
               type="password"
               value={form.password}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-500 outline-none"
               required
               minLength={6}
             />
@@ -102,7 +103,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-600 text-white py-2.5 rounded-lg font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-brand-600 py-3.5 text-base font-semibold text-white hover:-translate-y-0.5 hover:bg-brand-700 disabled:opacity-50"
           >
             {loading ? 'Creating...' : 'Create account'}
           </button>

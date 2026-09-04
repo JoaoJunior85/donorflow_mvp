@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, formatCurrency } from '../services/api';
+import { SuccessBanner } from '../components/UI';
 
 export default function NewPaymentRequestPage() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function NewPaymentRequestPage() {
     invoiceUrl: '',
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -31,13 +33,15 @@ export default function NewPaymentRequestPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
     try {
       await api.createPaymentRequest({
         ...form,
         amount: Number(form.amount),
       });
-      navigate('/payment-requests');
+      setSuccess('Payment request submitted successfully.');
+      setTimeout(() => navigate('/payment-requests'), 700);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,6 +55,7 @@ export default function NewPaymentRequestPage() {
       <p className="text-slate-500 mb-8">Request payment from a purpose-based sub-wallet</p>
 
       {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
+      {success && <SuccessBanner title="Success" message={success} onClose={() => setSuccess('')} />}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 space-y-4">
         <div>

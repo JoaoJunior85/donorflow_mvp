@@ -4,28 +4,32 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { useAuth } from '../context/AuthContext';
 import { api, formatCurrency } from '../services/api';
 import StatCard from '../components/StatCard';
-import { DataTable, StatusBadge } from '../components/UI';
+import { DataTable, Icon, PageSkeleton, StatusBadge } from '../components/UI';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS = ['#092d43', '#19b975', '#f2b84b', '#e86b5d', '#4b8da8'];
 
 function DonorDashboard({ data }) {
+  const activity = data.recentTransactions?.slice(0, 4) ?? [];
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total Donated" value={formatCurrency(data.totalDonated)} accent="brand" />
-        <StatCard label="Total Spent" value={formatCurrency(data.totalSpent)} accent="amber" />
-        <StatCard label="Remaining Balance" value={formatCurrency(data.remainingBalance)} accent="green" />
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Donated" value={formatCurrency(data.totalDonated)} accent="donated" icon="wallet" />
+        <StatCard label="Total Spent" value={formatCurrency(data.totalSpent)} accent="amber" icon="chart" />
+        <StatCard label="Remaining Balance" value={formatCurrency(data.remainingBalance)} accent="green" icon="wallet" />
         <StatCard
           label="Pending Approvals"
           value={data.pendingApprovals}
           sub={`${data.activeProjects} active projects`}
           accent="red"
+          icon="clock"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="font-semibold text-lg mb-4">Spending by Category</h2>
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="dashboard-section min-w-0 p-5 sm:p-6">
+          <div className="section-header">
+            <h2 className="font-semibold text-lg">Spending by Category</h2>
+          </div>
           {data.spendingByCategory?.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -43,24 +47,51 @@ function DonorDashboard({ data }) {
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-lg">Pending Approvals</h2>
-            <Link to="/approvals" className="text-brand-600 text-sm font-medium hover:underline">
+        <div className="dashboard-section min-w-0 p-5 sm:p-6">
+          <div className="section-header">
+            <h2 className="font-semibold text-lg">Recent Activity</h2>
+            <Link to="/transactions" className="text-brand-600 text-sm font-semibold hover:underline">
               View all
             </Link>
           </div>
-          {data.pendingApprovals > 0 ? (
-            <p className="text-amber-700 bg-amber-50 p-4 rounded-lg text-sm">
-              You have {data.pendingApprovals} payment request(s) awaiting your review.
-            </p>
+          {activity.length ? (
+            <div>
+              {activity.map((item) => {
+                const payeeName = item.payee?.name ?? 'Payment';
+                const projectName = item.project?.title ?? 'Project transaction';
+                const subWalletName = item.subWallet?.name ?? 'General wallet';
+                const purpose = item.subWallet?.purpose ?? 'Project activity';
+
+                return (
+                  <div className="activity-row" key={item.id ?? item.referenceNumber}>
+                    <span className="activity-icon bg-emerald-50 text-emerald-600"><Icon name="check" size={21} /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{payeeName}</p>
+                      <p className="truncate text-xs text-slate-500">{projectName}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {subWalletName} · {purpose}
+                      </p>
+                    </div>
+                    <div className="min-w-[88px] text-right">
+                      <strong className="block text-sm text-emerald-600">{formatCurrency(item.amount)}</strong>
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-slate-400">Paid</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : data.pendingApprovals > 0 ? (
+            <div className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+              <Icon name="clock" size={20} />
+              <span>You have {data.pendingApprovals} payment request(s) awaiting review.</span>
+            </div>
           ) : (
             <p className="text-slate-500 text-sm">No pending approvals</p>
           )}
         </div>
       </div>
 
-      <h2 className="font-semibold text-lg mb-4">Recent Transactions</h2>
+      <h2 className="mb-4 text-lg font-semibold">Recent Transactions</h2>
       <DataTable
         emptyMessage="No transactions yet"
         columns={[
@@ -84,13 +115,13 @@ function DonorDashboard({ data }) {
 function RecipientDashboard({ data }) {
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <StatCard label="Assigned Projects" value={data.assignedProjects} accent="brand" />
-        <StatCard label="Pending Requests" value={data.pendingCount} accent="amber" />
-        <StatCard label="Completed Payments" value={data.approvedCount} accent="green" />
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard label="Assigned Projects" value={data.assignedProjects} accent="purple" icon="folder" />
+        <StatCard label="Pending Requests" value={data.pendingCount} accent="amber" icon="hourglass" />
+        <StatCard label="Completed Payments" value={data.approvedCount} accent="green" icon="payments" />
       </div>
 
-      <div className="flex justify-between items-center mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold text-lg">Available Sub-Wallets</h2>
         <Link
           to="/payment-requests/new"
@@ -112,7 +143,7 @@ function RecipientDashboard({ data }) {
         rows={data.subWallets}
       />
 
-      <h2 className="font-semibold text-lg mt-8 mb-4">Recent Requests</h2>
+      <h2 className="mb-4 mt-8 text-lg font-semibold">Recent Requests</h2>
       <DataTable
         emptyMessage="No payment requests yet"
         columns={[
@@ -130,12 +161,12 @@ function RecipientDashboard({ data }) {
 function AdminDashboard({ data }) {
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <StatCard label="Users" value={data.users} accent="brand" />
-        <StatCard label="Organizations" value={data.organizations} accent="green" />
-        <StatCard label="Projects" value={data.projects} accent="amber" />
-        <StatCard label="Flagged Requests" value={data.flaggedRequests} accent="red" />
-        <StatCard label="Pending Payees" value={data.pendingPayees} accent="amber" />
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Users" value={data.users} accent="brand" icon="users" />
+        <StatCard label="Organizations" value={data.organizations} accent="green" icon="building" />
+        <StatCard label="Projects" value={data.projects} accent="amber" icon="projects" />
+        <StatCard label="Flagged Requests" value={data.flaggedRequests} accent="red" icon="flag" />
+        <StatCard label="Pending Payees" value={data.pendingPayees} accent="purple" icon="clock" />
       </div>
 
       <h2 className="font-semibold text-lg mb-4">Recent Audit Logs</h2>
@@ -167,10 +198,10 @@ export default function DashboardPage() {
   }, []);
 
   if (error) return <p className="text-red-600">{error}</p>;
-  if (!data) return <p className="text-slate-500">Loading dashboard...</p>;
+  if (!data) return <PageSkeleton />;
 
   return (
-    <div>
+    <div className="page-enter">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">
         Welcome, {user.fullName.split(' ')[0]}
       </h1>
