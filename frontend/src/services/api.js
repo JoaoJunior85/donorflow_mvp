@@ -1,21 +1,52 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+const GET_CACHE_TTL = 30_000;
+const getCache = new Map();
+const pendingGets = new Map();
 
 function getToken() {
   return localStorage.getItem('donorflow_token');
 }
 
 async function request(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  const method = options.method ?? 'GET';
+  const isGet = method === 'GET';
   const token = getToken();
+  const cacheKey = `${API_BASE}${path}::${token ?? 'anonymous'}`;
+
+  if (isGet) {
+    const cached = getCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+    if (pendingGets.has(cacheKey)) return pendingGets.get(cacheKey);
+  }
+
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
+  const fetchRequest = fetch(`${API_BASE}${path}`, { ...options, headers })
+    .then(async (res) => {
+      const data = await res.json().catch(() => ({}));
 
-  if (!res.ok) {
-    throw new Error(data.error || 'Request failed');
-  }
-  return data;
+      if (!res.ok) {
+        throw new Error(data.error || 'Request failed');
+      }
+
+      if (isGet) {
+        getCache.set(cacheKey, { data, expiresAt: Date.now() + GET_CACHE_TTL });
+      } else {
+        getCache.clear();
+      }
+      return data;
+    })
+    .finally(() => {
+      if (isGet) pendingGets.delete(cacheKey);
+    });
+
+  if (isGet) pendingGets.set(cacheKey, fetchRequest);
+  return fetchRequest;
+}
+
+export function clearApiCache() {
+  getCache.clear();
 }
 
 export const api = {

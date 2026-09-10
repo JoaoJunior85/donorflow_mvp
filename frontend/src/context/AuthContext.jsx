@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, clearApiCache } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
+    clearApiCache();
     const { user, token } = await api.login({ email, password });
     localStorage.setItem('donorflow_token', token);
     setUser(user);
@@ -28,6 +29,7 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (data) => {
+    clearApiCache();
     const { user, token } = await api.register(data);
     localStorage.setItem('donorflow_token', token);
     setUser(user);
@@ -36,6 +38,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('donorflow_token');
+    clearApiCache();
     setUser(null);
   };
 
