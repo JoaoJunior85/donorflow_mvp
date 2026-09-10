@@ -30,23 +30,33 @@ export async function registerUser({ fullName, email, phone, password, role }) {
 }
 
 export async function loginUser({ email, password }) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    const err = new Error('Invalid email or password');
-    err.status = 401;
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      const err = new Error('Invalid email or password');
+      err.status = 401;
+      throw err;
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      const err = new Error('Invalid email or password');
+      err.status = 401;
+      throw err;
+    }
+
+    const token = signToken({ id: user.id, email: user.email, role: user.role });
+    const { passwordHash, ...safeUser } = user;
+    return { user: safeUser, token };
+  } catch (err) {
+    console.error('Login failed', {
+      name: err.name,
+      code: err.code,
+      message: err.message,
+      email,
+    });
     throw err;
   }
-
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    const err = new Error('Invalid email or password');
-    err.status = 401;
-    throw err;
-  }
-
-  const token = signToken({ id: user.id, email: user.email, role: user.role });
-  const { passwordHash, ...safeUser } = user;
-  return { user: safeUser, token };
 }
 
 export async function getUserById(id) {
