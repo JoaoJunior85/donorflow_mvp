@@ -17,6 +17,14 @@ model User {
   role         String   @db.VarChar(20)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  donorProjects      Project[]        @relation("DonorProjects")
+  recipientProjects  Project[]        @relation("RecipientProjects")
+  walletsAsDonor     Wallet[]         @relation("WalletDonor")
+  walletsAsRecipient Wallet[]         @relation("WalletRecipient")
+  paymentRequests    PaymentRequest[] @relation("RequestedBy")
+  approvals          Approval[]
+  auditLogs          AuditLog[]
+
   @@map("users")
 }
 
@@ -38,12 +46,18 @@ model Project {
   title       String    @db.VarChar(200)
   description String?
   donorId     String    @map("donor_id") @db.Uuid
-  recipientId String    @map("recipient_id") @db.Uuid
+  recipientId String?   @map("recipient_id") @db.Uuid
   totalBudget Decimal   @map("total_budget") @db.Decimal(14, 2)
   status      String    @default("draft") @db.VarChar(30)
   startDate   DateTime? @map("start_date") @db.Date
   endDate     DateTime? @map("end_date") @db.Date
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  donor           User             @relation("DonorProjects", fields: [donorId], references: [id])
+  recipient       User?            @relation("RecipientProjects", fields: [recipientId], references: [id])
+  wallet          Wallet?
+  paymentRequests PaymentRequest[]
+  transactions    Transaction[]
 
   @@map("projects")
 }
@@ -52,10 +66,16 @@ model Wallet {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   projectId   String   @unique @map("project_id") @db.Uuid
   donorId     String   @map("donor_id") @db.Uuid
-  recipientId String   @map("recipient_id") @db.Uuid
+  recipientId String?  @map("recipient_id") @db.Uuid
   currency    String   @default("MZN") @db.Char(3)
   status      String   @default("active") @db.VarChar(30)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  donor         User          @relation("WalletDonor", fields: [donorId], references: [id])
+  recipient     User?         @relation("WalletRecipient", fields: [recipientId], references: [id])
+  subWallets    SubWallet[]
+  ledgerEntries LedgerEntry[]
 
   @@map("wallets")
 }
@@ -69,6 +89,11 @@ model SubWallet {
   approvalLimit   Decimal  @default(0) @map("approval_limit") @db.Decimal(14, 2)
   status          String   @default("active") @db.VarChar(30)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  wallet          Wallet           @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  paymentRequests PaymentRequest[]
+  transactions    Transaction[]
+  ledgerEntries   LedgerEntry[]
 
   @@map("sub_wallets")
 }
@@ -86,6 +111,9 @@ model Payee {
   verificationStatus  String   @default("pending") @map("verification_status") @db.VarChar(30)
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  paymentRequests PaymentRequest[]
+  transactions    Transaction[]
+
   @@map("payees")
 }
 
@@ -102,6 +130,13 @@ model PaymentRequest {
   status      String   @default("pending") @db.VarChar(30)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  project     Project      @relation(fields: [projectId], references: [id])
+  subWallet   SubWallet    @relation(fields: [subWalletId], references: [id])
+  requester   User         @relation("RequestedBy", fields: [requestedBy], references: [id])
+  payee       Payee        @relation(fields: [payeeId], references: [id])
+  approvals   Approval[]
+  transaction Transaction?
+
   @@map("payment_requests")
 }
 
@@ -117,6 +152,12 @@ model Transaction {
   referenceNumber  String   @unique @map("reference_number") @db.VarChar(100)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId], references: [id])
+  project        Project        @relation(fields: [projectId], references: [id])
+  subWallet      SubWallet      @relation(fields: [subWalletId], references: [id])
+  payee          Payee          @relation(fields: [payeeId], references: [id])
+  ledgerEntries  LedgerEntry[]
+
   @@map("transactions")
 }
 
@@ -131,6 +172,10 @@ model LedgerEntry {
   description   String?
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+  wallet      Wallet       @relation(fields: [walletId], references: [id])
+  subWallet   SubWallet?   @relation(fields: [subWalletId], references: [id])
+
   @@map("ledger_entries")
 }
 
@@ -141,6 +186,9 @@ model Approval {
   comment          String?
   createdAt        DateTime         @default(now()) @map("created_at")
   decision         ApprovalDecision
+
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId], references: [id])
+  approver       User            @relation(fields: [approverId], references: [id])
 
   @@map("approvals")
 }
@@ -154,6 +202,8 @@ model AuditLog {
   oldValue   Json?    @map("old_value")
   newValue   Json?    @map("new_value")
   createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
 }
