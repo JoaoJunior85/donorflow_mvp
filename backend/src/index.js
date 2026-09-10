@@ -34,10 +34,14 @@ const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 const localOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+const vercelPreviewPattern = /^https:\/\/donorflow-[a-z0-9-]+\.vercel\.app$/i;
 
 app.use(cors({
   origin: (origin, callback) => {
-    const isAllowed = !origin || configuredOrigins.includes(origin) || (!isProduction && localOriginPattern.test(origin));
+    const isAllowed = !origin
+      || configuredOrigins.includes(origin)
+      || (!isProduction && localOriginPattern.test(origin))
+      || (isProduction && vercelPreviewPattern.test(origin));
     if (isAllowed) {
       callback(null, true);
       return;
