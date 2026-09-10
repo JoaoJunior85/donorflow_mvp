@@ -3,6 +3,8 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Icon } from './UI';
+import sidebarLogo from '../../images/donorflow_badge_sidebar_clean.png';
+import mobileLogo from '../../images/donorflow_badge_clean.png';
 
 const navByRole = {
   donor: [
@@ -102,7 +104,7 @@ export default function Layout({ children }) {
       {menuOpen && <button aria-label="Close navigation" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-20 bg-[#092d43]/40 lg:hidden" />}
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col bg-brand-900 text-white shadow-2xl transition-transform duration-300 lg:static lg:w-64 lg:translate-x-0 lg:shadow-none ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="border-b border-white/10 p-5">
-          <div className="brand-logo dashboard-logo sidebar-logo"><img src="/images/donorflow_badge_sidebar_clean.png" alt="DonorFlow" /></div>
+          <div className="brand-logo dashboard-logo sidebar-logo"><img src={sidebarLogo} alt="DonorFlow" /></div>
           <p className="mt-2 text-xs text-brand-100">Funds · Projects · Impact</p>
         </div>
         <nav className="flex-1 space-y-1 p-4">
@@ -143,7 +145,7 @@ export default function Layout({ children }) {
           <button onClick={() => setMenuOpen(true)} className="rounded-xl p-2 text-brand-900 hover:bg-brand-50" aria-label="Open navigation">
             <Icon name="menu" size={22} />
           </button>
-          <div className="brand-logo dashboard-logo mobile-logo"><img src="/images/donorflow_badge_clean.png" alt="DonorFlow" /></div>
+          <div className="brand-logo dashboard-logo mobile-logo"><img src={mobileLogo} alt="DonorFlow" /></div>
           <div className="flex items-center gap-3">
             <div className="relative">
               <button

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logo from '../../images/donorflow_badge_clean.png';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -35,7 +36,7 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_right,#1dbd7a_0,#092d43_42%,#061c2b_100%)] p-4 sm:p-6">
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-9">
         <div className="text-center mb-8">
-          <div className="brand-logo auth-logo mx-auto mb-4"><img src="/images/donorflow_badge_clean.png" alt="DonorFlow" /></div>
+          <div className="brand-logo auth-logo mx-auto mb-4"><img src={logo} alt="DonorFlow" /></div>
           <h1 className="text-2xl font-bold text-brand-900">Create your account</h1>
           <p className="text-slate-500 mt-1">Join DonorFlow</p>
         </div>
