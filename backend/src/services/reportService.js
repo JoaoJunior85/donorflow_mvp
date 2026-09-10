@@ -1,5 +1,5 @@
 import prisma from '../lib/prisma.js';
-import { getSubWalletSpent, getWalletTotals } from './walletService.js';
+import { getSubWalletSpentByIds, getWalletTotalsForSubWallets } from './walletService.js';
 
 export async function getDonorDashboard(userId) {
   const projects = await prisma.project.findMany({
@@ -7,19 +7,14 @@ export async function getDonorDashboard(userId) {
     include: { wallet: { include: { subWallets: true } } },
   });
 
-  let totalDonated = 0;
-  let totalSpent = 0;
-  const pendingApprovals = await prisma.paymentRequest.count({
-    where: { project: { donorId: userId }, status: 'pending' },
-  });
-
-  for (const p of projects) {
-    if (p.wallet) {
-      const totals = await getWalletTotals(p.wallet.id);
-      totalDonated += totals.funded;
-      totalSpent += totals.spent;
-    }
-  }
+  const subWalletIds = projects.flatMap((project) => project.wallet?.subWallets.map((sw) => sw.id) ?? []);
+  const [walletTotals, pendingApprovals, spentBySubWallet] = await Promise.all([
+    Promise.all(projects.filter((project) => project.wallet).map((project) => getWalletTotalsForSubWallets(project.wallet.id, project.wallet.subWallets))),
+    prisma.paymentRequest.count({ where: { project: { donorId: userId }, status: 'pending' } }),
+    getSubWalletSpentByIds(subWalletIds),
+  ]);
+  const totalDonated = walletTotals.reduce((sum, totals) => sum + totals.funded, 0);
+  const totalSpent = walletTotals.reduce((sum, totals) => sum + totals.spent, 0);
 
   const recentTransactions = await prisma.transaction.findMany({
     where: { project: { donorId: userId } },
@@ -32,16 +27,12 @@ export async function getDonorDashboard(userId) {
     take: 10,
   });
 
-  const spendingByCategory = [];
-  for (const p of projects) {
-    if (!p.wallet) continue;
-    for (const sw of p.wallet.subWallets) {
-      const spent = await getSubWalletSpent(sw.id);
-      if (spent > 0) {
-        spendingByCategory.push({ name: sw.name, value: spent });
-      }
-    }
-  }
+  const spendingByCategory = projects.flatMap((project) =>
+    project.wallet?.subWallets.flatMap((sw) => {
+      const spent = spentBySubWallet.get(sw.id) ?? 0;
+      return spent > 0 ? [{ name: sw.name, value: spent }] : [];
+    }) ?? []
+  );
 
   return {
     totalDonated,
@@ -64,11 +55,13 @@ export async function getRecipientDashboard(userId) {
     include: { wallet: { include: { subWallets: true } } },
   });
 
+  const subWalletIds = projects.flatMap((project) => project.wallet?.subWallets.map((sw) => sw.id) ?? []);
+  const spentBySubWallet = await getSubWalletSpentByIds(subWalletIds);
   const subWallets = [];
   for (const p of projects) {
     if (!p.wallet) continue;
     for (const sw of p.wallet.subWallets) {
-      const spent = await getSubWalletSpent(sw.id);
+      const spent = spentBySubWallet.get(sw.id) ?? 0;
       subWallets.push({
         projectTitle: p.title,
         projectId: p.id,
@@ -149,12 +142,14 @@ export async function getProjectReport(projectId, userId, role) {
     throw err;
   }
 
-  const totals = project.wallet ? await getWalletTotals(project.wallet.id) : null;
+  const totals = project.wallet
+    ? await getWalletTotalsForSubWallets(project.wallet.id, project.wallet.subWallets)
+    : null;
   const subWalletReports = [];
 
   if (project.wallet) {
     for (const sw of project.wallet.subWallets) {
-      const spent = await getSubWalletSpent(sw.id);
+      const spent = totals.spentBySubWallet.get(sw.id) ?? 0;
       subWalletReports.push({
         id: sw.id,
         name: sw.name,

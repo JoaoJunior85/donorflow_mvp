@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { createAuditLog } from '../lib/utils.js';
-import { getSubWalletBalance, getSubWalletSpent, getWalletTotals } from './walletService.js';
+import { getWalletTotalsForSubWallets } from './walletService.js';
 
 export async function createProject(donorId, data) {
   const project = await prisma.project.create({
@@ -160,23 +160,24 @@ export async function getProjectsForUser(userId, role) {
 
   return Promise.all(
     projects.map(async (p) => {
-      const totals = p.wallet ? await getWalletTotals(p.wallet.id) : null;
+      const totals = p.wallet ? await getWalletTotalsForSubWallets(p.wallet.id, p.wallet.subWallets) : null;
       const subWallets = p.wallet
-        ? await Promise.all(
-            p.wallet.subWallets.map(async (sw) => ({
+        ? p.wallet.subWallets.map((sw) => {
+            const spent = totals.spentBySubWallet.get(sw.id) ?? 0;
+            return {
               ...sw,
               allocatedAmount: Number(sw.allocatedAmount),
               approvalLimit: sw.approvalLimit ? Number(sw.approvalLimit) : null,
-              spent: await getSubWalletSpent(sw.id),
-              balance: await getSubWalletBalance(sw),
-            }))
-          )
+              spent,
+              balance: Number(sw.allocatedAmount) - spent,
+            };
+          })
         : [];
 
       return {
         ...p,
         totalBudget: Number(p.totalBudget),
-        wallet: p.wallet ? { ...p.wallet, totals, subWallets } : null,
+        wallet: p.wallet ? { ...p.wallet, totals: { ...totals, spentBySubWallet: undefined }, subWallets } : null,
       };
     })
   );
@@ -216,23 +217,28 @@ export async function getProjectById(projectId, userId, role) {
     throw err;
   }
 
-  const totals = project.wallet ? await getWalletTotals(project.wallet.id) : null;
+  const totals = project.wallet
+    ? await getWalletTotalsForSubWallets(project.wallet.id, project.wallet.subWallets)
+    : null;
   const subWallets = project.wallet
-    ? await Promise.all(
-        project.wallet.subWallets.map(async (sw) => ({
+    ? project.wallet.subWallets.map((sw) => {
+        const spent = totals.spentBySubWallet.get(sw.id) ?? 0;
+        return {
           ...sw,
           allocatedAmount: Number(sw.allocatedAmount),
           approvalLimit: sw.approvalLimit ? Number(sw.approvalLimit) : null,
-          spent: await getSubWalletSpent(sw.id),
-          balance: await getSubWalletBalance(sw),
-        }))
-      )
+          spent,
+          balance: Number(sw.allocatedAmount) - spent,
+        };
+      })
     : [];
 
   return {
     ...project,
     totalBudget: Number(project.totalBudget),
-    wallet: project.wallet ? { ...project.wallet, totals, subWallets } : null,
+    wallet: project.wallet
+      ? { ...project.wallet, totals: { ...totals, spentBySubWallet: undefined }, subWallets }
+      : null,
     paymentRequests: project.paymentRequests.map((pr) => ({
       ...pr,
       amount: Number(pr.amount),

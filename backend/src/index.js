@@ -29,14 +29,16 @@ if (isProduction && !process.env.FRONTEND_URL) {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+const localOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const isAllowed = !origin || configuredOrigins.includes(origin) || (!isProduction && localOriginPattern.test(origin));
+    if (isAllowed) {
       callback(null, true);
       return;
     }

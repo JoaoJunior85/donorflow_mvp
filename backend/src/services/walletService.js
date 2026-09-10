@@ -8,6 +8,18 @@ export async function getSubWalletSpent(subWalletId) {
   return Number(result._sum.amount ?? 0);
 }
 
+export async function getSubWalletSpentByIds(subWalletIds) {
+  if (!subWalletIds.length) return new Map();
+
+  const results = await prisma.ledgerEntry.groupBy({
+    by: ['subWalletId'],
+    where: { subWalletId: { in: subWalletIds }, entryType: 'debit' },
+    _sum: { amount: true },
+  });
+
+  return new Map(results.map((result) => [result.subWalletId, Number(result._sum.amount ?? 0)]));
+}
+
 export async function getSubWalletBalance(subWallet) {
   const spent = await getSubWalletSpent(subWallet.id);
   return Number(subWallet.allocatedAmount) - spent;
@@ -15,18 +27,19 @@ export async function getSubWalletBalance(subWallet) {
 
 export async function getWalletTotals(walletId) {
   const subWallets = await prisma.subWallet.findMany({ where: { walletId } });
-  let allocated = 0;
-  let spent = 0;
+  return getWalletTotalsForSubWallets(walletId, subWallets);
+}
 
-  for (const sw of subWallets) {
-    allocated += Number(sw.allocatedAmount);
-    spent += await getSubWalletSpent(sw.id);
-  }
-
-  const credits = await prisma.ledgerEntry.aggregate({
-    where: { walletId, entryType: 'credit', subWalletId: null },
-    _sum: { amount: true },
-  });
+export async function getWalletTotalsForSubWallets(walletId, subWallets) {
+  const [spentBySubWallet, credits] = await Promise.all([
+    getSubWalletSpentByIds(subWallets.map((sw) => sw.id)),
+    prisma.ledgerEntry.aggregate({
+      where: { walletId, entryType: 'credit', subWalletId: null },
+      _sum: { amount: true },
+    }),
+  ]);
+  const allocated = subWallets.reduce((sum, sw) => sum + Number(sw.allocatedAmount), 0);
+  const spent = subWallets.reduce((sum, sw) => sum + (spentBySubWallet.get(sw.id) ?? 0), 0);
   const funded = Number(credits._sum.amount ?? 0);
 
   return {
@@ -34,6 +47,7 @@ export async function getWalletTotals(walletId) {
     allocated,
     spent,
     remaining: funded - spent,
+    spentBySubWallet,
   };
 }
 
