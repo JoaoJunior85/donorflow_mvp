@@ -280,7 +280,7 @@ async function completePayment(paymentRequest, fullRequest) {
       subWalletId: paymentRequest.subWalletId,
       entryType: 'debit',
       amount: paymentRequest.amount,
-      currency: fullRequest.subWallet.wallet?.currency ?? 'MZN',
+      currency: fullRequest.subWallet.wallet?.currency ?? 'USD',
       description: `Payment to ${fullRequest.payee.name}: ${paymentRequest.purpose}`,
     },
   });

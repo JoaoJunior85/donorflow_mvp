@@ -50,7 +50,7 @@ export async function fundProject(projectId, donorId, amount) {
         projectId,
         donorId,
         recipientId: project.recipientId,
-        currency: 'MZN',
+        currency: 'USD',
       },
     });
   }

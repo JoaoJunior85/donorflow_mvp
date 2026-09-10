@@ -95,8 +95,8 @@ export const api = {
   getOrganizations: () => request('/reports/organizations'),
 };
 
-export function formatCurrency(amount, currency = 'ZMW') {
-  return `${currency === 'ZMW' ? 'K' : currency + ' '}${Number(amount).toLocaleString(undefined, {
+export function formatCurrency(amount, currency = 'USD') {
+  return `${currency === 'USD' ? '$' : currency + ' '}${Number(amount).toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;

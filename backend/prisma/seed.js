@@ -103,7 +103,7 @@ async function main() {
       projectId: project.id,
       donorId: donor.id,
       recipientId: recipient.id,
-      currency: 'ZMW',
+      currency: 'USD',
       status: 'active',
     },
   });
@@ -113,7 +113,7 @@ async function main() {
       walletId: wallet.id,
       entryType: 'credit',
       amount: 150000,
-      currency: 'ZMW',
+      currency: 'USD',
       description: 'Initial funding — Lusaka Community Health Outreach',
     },
   });
@@ -207,7 +207,7 @@ async function main() {
       subWalletId: subWallets[1].id,
       entryType: 'debit',
       amount: 12000,
-      currency: 'ZMW',
+      currency: 'USD',
       description: 'Payment to Chikondi Catering Services: Community health screening kits',
     },
   });
@@ -227,7 +227,7 @@ async function main() {
   console.log('Recipient:', recipient.fullName, recipient.email);
   console.log('Currency:', wallet.currency);
   console.log('Sub-wallets:', subWallets.map((item) => item.name).join(', '));
-  console.log('Pending request:', pendingRequest.purpose, 'ZMW', pendingRequest.amount.toString());
+  console.log('Pending request:', pendingRequest.purpose, 'USD', pendingRequest.amount.toString());
   console.log('\nLogin details (password: password123):');
   console.log('Admin:', admin.email);
   console.log('Donor:', donor.email);

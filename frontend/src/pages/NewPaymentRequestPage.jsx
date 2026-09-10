@@ -110,7 +110,7 @@ export default function NewPaymentRequestPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Amount (ZMW)</label>
+          <label className="block text-sm font-medium mb-1">Amount (USD)</label>
           <input
             type="number"
             value={form.amount}

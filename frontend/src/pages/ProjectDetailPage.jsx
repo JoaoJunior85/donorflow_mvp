@@ -82,7 +82,7 @@ export default function ProjectDetailPage() {
               </div>
               <input
                 type="number"
-                placeholder="Amount (ZMW)"
+                placeholder="Amount (USD)"
                 value={fundAmount}
                 onChange={(e) => setFundAmount(e.target.value)}
                 className="mb-4 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"

@@ -67,7 +67,7 @@ model Wallet {
   projectId   String   @unique @map("project_id") @db.Uuid
   donorId     String   @map("donor_id") @db.Uuid
   recipientId String?  @map("recipient_id") @db.Uuid
-  currency    String   @default("MZN") @db.Char(3)
+  currency    String   @default("USD") @db.Char(3)
   status      String   @default("active") @db.VarChar(30)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -168,7 +168,7 @@ model LedgerEntry {
   subWalletId   String?  @map("sub_wallet_id") @db.Uuid
   entryType     String   @map("entry_type") @db.VarChar(30)
   amount        Decimal  @db.Decimal(14, 2)
-  currency      String   @default("MZN") @db.Char(3)
+  currency      String   @default("USD") @db.Char(3)
   description   String?
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
