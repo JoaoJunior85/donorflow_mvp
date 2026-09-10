@@ -4,7 +4,7 @@ import { signToken } from '../lib/auth.js';
 import { createAuditLog } from '../lib/utils.js';
 
 export async function registerUser({ fullName, email, phone, password, role }) {
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findFirst({ where: { email } });
   if (existing) {
     const err = new Error('Email already registered');
     err.status = 409;
@@ -31,7 +31,7 @@ export async function registerUser({ fullName, email, phone, password, role }) {
 
 export async function loginUser({ email, password }) {
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findFirst({ where: { email } });
     if (!user) {
       const err = new Error('Invalid email or password');
       err.status = 401;
