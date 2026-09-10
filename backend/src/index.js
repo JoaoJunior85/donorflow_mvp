@@ -31,7 +31,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 const localOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
@@ -42,6 +42,7 @@ app.use(cors({
       callback(null, true);
       return;
     }
+    console.error('CORS origin rejected', { origin });
     callback(new Error('Origin not allowed by CORS'));
   },
   credentials: true,
