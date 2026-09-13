@@ -210,6 +210,7 @@ export async function getNotifications(userId, role) {
         payee: { select: { name: true } },
         project: { select: { title: true } },
         requester: { select: { fullName: true } },
+        approvals: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
       take: 12,
@@ -217,9 +218,10 @@ export async function getNotifications(userId, role) {
 
     return requests.map((request) => ({
       id: `pr-${request.id}-${request.status}`,
-      label: `${request.requester?.fullName ?? 'Recipient'} requested ${Number(request.amount).toLocaleString()} for ${request.purpose} (${request.status})`,
+      title: request.status === 'pending' ? 'New payment request' : 'Payment request updated',
+      label: `${request.requester?.fullName ?? 'Recipient'} · ${request.project?.title ?? 'Project'} · ${request.purpose} · ${Number(request.amount).toLocaleString()}`,
       to: '/approvals',
-      createdAt: request.createdAt,
+      createdAt: request.approvals[0]?.createdAt ?? request.createdAt,
       status: request.status,
     }));
   }
@@ -230,16 +232,24 @@ export async function getNotifications(userId, role) {
       include: {
         payee: { select: { name: true } },
         project: { select: { title: true } },
+        approvals: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
       take: 12,
     });
 
+    const statusTitles = {
+      pending: 'Awaiting donor review',
+      completed: 'Payment completed',
+      rejected: 'Payment rejected',
+      frozen: 'Payment request frozen',
+    };
     return requests.map((request) => ({
       id: `pr-${request.id}-${request.status}`,
-      label: `${request.project?.title ?? 'Project'}: ${request.purpose} is ${request.status}`,
+      title: statusTitles[request.status] ?? 'Payment request updated',
+      label: `${request.project?.title ?? 'Project'} · ${request.purpose} · ${Number(request.amount).toLocaleString()}`,
       to: '/payment-requests',
-      createdAt: request.createdAt,
+      createdAt: request.approvals[0]?.createdAt ?? request.createdAt,
       status: request.status,
     }));
   }

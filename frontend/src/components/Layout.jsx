@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, notifyApp } from '../services/api';
 import { Icon } from './UI';
-import sidebarLogo from '../../images/donorflow_badge_sidebar_final.png';
+import sidebarLogo from '../../images/donorflow_badge_sidebar_clean.png';
 import mobileLogo from '../../images/donorflow_badge_clean.png';
 
 const navByRole = {
@@ -29,6 +29,46 @@ const navByRole = {
     { to: '/audit-logs', label: 'Audit Logs', icon: 'report' },
   ],
 };
+
+function notificationTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function NotificationList({ notifications, onSelect }) {
+  return (
+    <div className="notification-popover" role="dialog" aria-label="Recent notifications">
+      <div className="notification-popover-heading">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notifications</p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">Recent request activity</p>
+        </div>
+        {notifications.length > 0 && <span className="notification-total">{notifications.length}</span>}
+      </div>
+      <div className="notification-list">
+        {notifications.length ? notifications.map((item, index) => (
+          <NavLink
+            key={`${item.id ?? item.label}-${index}`}
+            to={item.to || '/dashboard'}
+            onClick={onSelect}
+            className="notification-item"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-slate-800">{item.title ?? 'Payment request update'}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{item.label}</p>
+              <p className="mt-2 text-[11px] text-slate-400">{notificationTime(item.createdAt)}</p>
+            </div>
+            {item.status && <span className={`notification-status notification-status-${item.status}`}>{item.status.replaceAll('_', ' ')}</span>}
+          </NavLink>
+        )) : (
+          <p className="px-2 py-4 text-center text-sm text-slate-500">No recent request activity</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -149,7 +189,6 @@ export default function Layout({ children }) {
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col bg-brand-900 text-white shadow-2xl transition-transform duration-300 lg:static lg:w-64 lg:translate-x-0 lg:shadow-none ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="border-b border-white/10 p-5">
           <div className="brand-logo dashboard-logo sidebar-logo"><img src={sidebarLogo} alt="DonorFlow" /></div>
-          <p className="mt-2 text-xs text-brand-100">Funds · Projects · Impact</p>
         </div>
         <nav className="flex-1 space-y-1 p-4">
           {links.map((link) => (
@@ -206,23 +245,7 @@ export default function Layout({ children }) {
                 )}
               </button>
               {notificationOpen && (
-                <div className="absolute right-0 top-12 z-40 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notifications</p>
-                  <div className="space-y-2">
-                    {notifications.length ? notifications.map((item, index) => (
-                      <NavLink
-                        key={`${item.id ?? item.label}-${index}`}
-                        to={item.to || '/dashboard'}
-                        onClick={() => setNotificationOpen(false)}
-                        className="block rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-brand-50 hover:text-brand-700"
-                      >
-                        {item.label}
-                      </NavLink>
-                    )) : (
-                      <p className="px-2 py-3 text-sm text-slate-500">No new notifications</p>
-                    )}
-                  </div>
-                </div>
+                <NotificationList notifications={notifications} onSelect={() => setNotificationOpen(false)} />
               )}
             </div>
             <div className="user-avatar user-avatar-mobile" aria-label="User profile"><Icon name="user" size={23} /></div>
@@ -250,23 +273,7 @@ export default function Layout({ children }) {
                 )}
               </button>
               {notificationOpen && (
-                <div className="absolute right-0 top-11 z-40 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notifications</p>
-                  <div className="space-y-2">
-                    {notifications.length ? notifications.map((item, index) => (
-                      <NavLink
-                        key={`${item.id ?? item.label}-${index}`}
-                        to={item.to || '/dashboard'}
-                        onClick={() => setNotificationOpen(false)}
-                        className="block rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-brand-50 hover:text-brand-700"
-                      >
-                        {item.label}
-                      </NavLink>
-                    )) : (
-                      <p className="px-2 py-3 text-sm text-slate-500">No new notifications</p>
-                    )}
-                  </div>
-                </div>
+                <NotificationList notifications={notifications} onSelect={() => setNotificationOpen(false)} />
               )}
             </div>
             <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">
