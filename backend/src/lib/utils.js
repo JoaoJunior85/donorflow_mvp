@@ -1,7 +1,7 @@
 import prisma from './prisma.js';
 
-export async function createAuditLog({ userId, action, entityType, entityId, oldValue, newValue }) {
-  return prisma.auditLog.create({
+export async function createAuditLog({ userId, action, entityType, entityId, oldValue, newValue }, db = prisma) {
+  return db.auditLog.create({
     data: {
       userId,
       action,

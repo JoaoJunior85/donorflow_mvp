@@ -102,6 +102,7 @@ model Payee {
   id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                String   @db.VarChar(200)
   type                String   @db.VarChar(100)
+  serviceProvided     String?  @map("service_provided") @db.VarChar(255)
   phone               String?  @db.VarChar(30)
   email               String?  @db.VarChar(255)
   bankName            String?  @map("bank_name") @db.VarChar(150)

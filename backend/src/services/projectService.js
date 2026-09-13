@@ -32,6 +32,13 @@ export async function createProject(donorId, data) {
 }
 
 export async function fundProject(projectId, donorId, amount) {
+  const fundingAmount = Number(amount);
+  if (!Number.isFinite(fundingAmount) || fundingAmount <= 0) {
+    const err = new Error('Funding amount must be a finite positive number');
+    err.status = 400;
+    throw err;
+  }
+
   const project = await prisma.project.findFirst({
     where: { id: projectId, donorId },
     include: { wallet: true },
@@ -40,6 +47,20 @@ export async function fundProject(projectId, donorId, amount) {
   if (!project) {
     const err = new Error('Project not found');
     err.status = 404;
+    throw err;
+  }
+
+  const fundedAmount = project.wallet
+    ? Number(
+        (await prisma.ledgerEntry.aggregate({
+          where: { walletId: project.wallet.id, entryType: 'credit', subWalletId: null },
+          _sum: { amount: true },
+        }))._sum.amount ?? 0
+      )
+    : 0;
+  if (fundedAmount + fundingAmount > Number(project.totalBudget)) {
+    const err = new Error('Funding exceeds the project budget');
+    err.status = 400;
     throw err;
   }
 
@@ -59,7 +80,7 @@ export async function fundProject(projectId, donorId, amount) {
     data: {
       walletId: wallet.id,
       entryType: 'credit',
-      amount,
+      amount: fundingAmount,
       currency: wallet.currency,
       description: `Project funding: ${project.title}`,
     },
@@ -75,13 +96,27 @@ export async function fundProject(projectId, donorId, amount) {
     action: 'Wallet funded',
     entityType: 'wallet',
     entityId: wallet.id,
-    newValue: { amount: Number(amount), projectId },
+    newValue: { amount: fundingAmount, projectId },
   });
 
-  return { wallet, amount: Number(amount) };
+  return { wallet, amount: fundingAmount };
 }
 
 export async function createSubWallet(projectId, donorId, data) {
+  const requestedAllocation = Number(data.allocatedAmount);
+  const approvalLimit = data.approvalLimit === undefined || data.approvalLimit === null || data.approvalLimit === ''
+    ? 0
+    : Number(data.approvalLimit);
+  if (!Number.isFinite(requestedAllocation) || requestedAllocation <= 0) {
+    const err = new Error('Sub-wallet allocation must be a finite positive number');
+    err.status = 400;
+    throw err;
+  }
+  if (!Number.isFinite(approvalLimit) || approvalLimit < 0) {
+    const err = new Error('Approval limit must be zero or a positive number');
+    err.status = 400;
+    throw err;
+  }
   const project = await prisma.project.findFirst({
     where: { id: projectId, donorId },
     include: {
@@ -108,7 +143,6 @@ export async function createSubWallet(projectId, donorId, data) {
     (sum, sw) => sum + Number(sw.allocatedAmount),
     0
   );
-  const requestedAllocation = Number(data.allocatedAmount);
   const availableBalance = Math.max(0, fundedAmount - existingAllocation);
 
   if (requestedAllocation > availableBalance) {
@@ -124,8 +158,8 @@ export async function createSubWallet(projectId, donorId, data) {
       walletId: project.wallet.id,
       name: data.name,
       purpose: data.purpose,
-      allocatedAmount: data.allocatedAmount,
-      approvalLimit: data.approvalLimit ?? null,
+      allocatedAmount: requestedAllocation,
+      approvalLimit,
     },
   });
 

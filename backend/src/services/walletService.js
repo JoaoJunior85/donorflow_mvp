@@ -53,17 +53,25 @@ export async function getWalletTotalsForSubWallets(walletId, subWallets) {
 
 export function evaluatePaymentRequestRules({ amount, subWallet, payee, invoiceUrl }) {
   const flags = [];
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { blocked: true, reason: 'Payment amount must be greater than zero', flags };
+  }
+
+  if (subWallet.status !== 'active') {
+    return { blocked: true, reason: 'Sub-wallet is not active', flags };
+  }
+
+  if (subWallet.wallet?.status && subWallet.wallet.status !== 'active') {
+    return { blocked: true, reason: 'Wallet is not active', flags };
+  }
+
   const balance = Number(subWallet.allocatedAmount) - Number(subWallet._spent ?? 0);
 
-  if (amount > balance) {
+  if (balance < 0 || amount > balance) {
     return { blocked: true, reason: 'Amount exceeds available sub-wallet balance', flags };
   }
 
-  if (subWallet.status === 'frozen') {
-    return { blocked: true, reason: 'Sub-wallet is frozen', flags };
-  }
-
-  if (subWallet.approvalLimit && amount > Number(subWallet.approvalLimit)) {
+  if (Number(subWallet.approvalLimit ?? 0) > 0 && amount > Number(subWallet.approvalLimit)) {
     flags.push('Amount exceeds approval limit — donor approval required');
   }
 

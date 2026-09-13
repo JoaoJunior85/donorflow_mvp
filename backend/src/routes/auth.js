@@ -5,12 +5,19 @@ const router = Router();
 
 router.post('/register', async (req, res, next) => {
   try {
-    const { fullName, email, phone, password, role } = req.body;
+    const fullName = String(req.body.fullName ?? '').trim();
+    const email = String(req.body.email ?? '').trim().toLowerCase();
+    const phone = req.body.phone ? String(req.body.phone).trim() : undefined;
+    const password = String(req.body.password ?? '');
+    const role = req.body.role;
     if (!fullName || !email || !password || !role) {
       return res.status(400).json({ error: 'fullName, email, password, and role are required' });
     }
-    if (!['donor', 'recipient', 'admin'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    if (!['donor', 'recipient'].includes(role)) {
+      return res.status(400).json({ error: 'Only donor and recipient accounts can self-register' });
     }
     const result = await registerUser({ fullName, email, phone, password, role });
     res.status(201).json(result);
@@ -21,7 +28,8 @@ router.post('/register', async (req, res, next) => {
 
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body.email ?? '').trim().toLowerCase();
+    const password = String(req.body.password ?? '');
     if (!email || !password) {
       return res.status(400).json({ error: 'email and password are required' });
     }

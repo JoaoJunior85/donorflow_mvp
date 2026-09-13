@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Icon } from '../components/UI';
 import logo from '../../images/donorflow_badge_clean.png';
 
 export default function RegisterPage() {
@@ -13,6 +14,7 @@ export default function RegisterPage() {
     password: '',
     role: 'donor',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -86,20 +88,30 @@ export default function RegisterPage() {
             >
               <option value="donor">Donor</option>
               <option value="recipient">Recipient</option>
-              <option value="admin">Admin</option>
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-500 outline-none"
-              required
-              minLength={6}
-            />
+            <div className="relative">
+              <input
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-12 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-500 outline-none"
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-slate-400 hover:text-brand-600"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <Icon name={showPassword ? 'eye-off' : 'eye'} size={20} />
+              </button>
+            </div>
           </div>
           <button
             type="submit"
