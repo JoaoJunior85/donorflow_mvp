@@ -1,7 +1,8 @@
 import prisma from './prisma.js';
+import { publishNotification } from './notifications.js';
 
 export async function createAuditLog({ userId, action, entityType, entityId, oldValue, newValue }, db = prisma) {
-  return db.auditLog.create({
+  const log = await db.auditLog.create({
     data: {
       userId,
       action,
@@ -11,6 +12,19 @@ export async function createAuditLog({ userId, action, entityType, entityId, old
       newValue: newValue ?? undefined,
     },
   });
+
+  publishNotification({
+    id: log.id,
+    action: log.action,
+    entityType: log.entityType,
+    entityId: log.entityId,
+    label: log.action,
+    createdAt: log.createdAt,
+    userId: log.userId,
+    roles: ['admin'],
+  });
+
+  return log;
 }
 
 export function generateReferenceNumber() {

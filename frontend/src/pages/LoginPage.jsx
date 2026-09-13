@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { EMAIL_PATTERN } from '../services/api';
 import { Icon } from '../components/UI';
 import logo from '../../images/donorflow_badge_clean.png';
 
@@ -16,6 +17,14 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
     setLoading(true);
     try {
       await login(email, password);

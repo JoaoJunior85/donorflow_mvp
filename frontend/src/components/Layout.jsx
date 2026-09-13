@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
+import { api, notifyApp } from '../services/api';
 import { Icon } from './UI';
-import sidebarLogo from '../../images/donorflow_badge_sidebar_clean.png';
+import sidebarLogo from '../../images/donorflow_badge_sidebar_final.png';
 import mobileLogo from '../../images/donorflow_badge_clean.png';
 
 const navByRole = {
@@ -38,36 +38,33 @@ export default function Layout({ children }) {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [toasts, setToasts] = useState([]);
   const links = navByRole[user?.role] ?? [];
 
+  const pushToast = (message) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current.slice(-3), { id, message }]);
+    setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, 4500);
+  };
+
   const loadNotifications = () => {
-    if (!user?.role || !['donor', 'admin'].includes(user.role)) {
+    if (!user?.role) {
       setNotifications([]);
-      return;
+      return Promise.resolve([]);
     }
 
-    api
-      .getDashboard()
-      .then((data) => {
-        if (user.role === 'donor') {
-          setNotifications(
-            data.pendingApprovals > 0
-              ? [{ label: `${data.pendingApprovals} payment request(s) awaiting approval`, to: '/approvals' }]
-              : []
-          );
-          return;
-        }
-
-        const items = [];
-        if (data.pendingPayees > 0) {
-          items.push({ label: `${data.pendingPayees} payee(s) awaiting verification`, to: '/payees' });
-        }
-        if (data.flaggedRequests > 0) {
-          items.push({ label: `${data.flaggedRequests} flagged request(s) need attention`, to: '/projects' });
-        }
+    return api
+      .getNotifications()
+      .then((items) => {
         setNotifications(items);
+        return items;
       })
-      .catch(() => setNotifications([]));
+      .catch(() => {
+        setNotifications([]);
+        return [];
+      });
   };
 
   useEffect(() => {
@@ -77,20 +74,67 @@ export default function Layout({ children }) {
   useEffect(() => {
     const handleRefresh = () => loadNotifications();
     window.addEventListener('donorflow:refresh-dashboard', handleRefresh);
-    return () => window.removeEventListener('donorflow:refresh-dashboard', handleRefresh);
+    const poll = setInterval(() => {
+      loadNotifications().then((items) => {
+        const newest = items[0];
+        if (newest && newest.id && newest.id !== window.__donorflowLastNotification) {
+          if (window.__donorflowLastNotification) {
+            pushToast(newest.label);
+          }
+          window.__donorflowLastNotification = newest.id;
+        }
+      });
+    }, 6000);
+    return () => {
+      window.removeEventListener('donorflow:refresh-dashboard', handleRefresh);
+      clearInterval(poll);
+    };
+  }, [user?.role]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('donorflow_token');
+    if (!token || !user?.role) return undefined;
+
+    const controller = new AbortController();
+    const streamUrl = `${(import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')}/reports/events`;
+
+    fetch(streamUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const chunks = buffer.split('\n\n');
+          buffer = chunks.pop() ?? '';
+          chunks.forEach((chunk) => {
+            const line = chunk.split('\n').find((part) => part.startsWith('data: '));
+            if (!line) return;
+            try {
+              const payload = JSON.parse(line.slice(6));
+              if (payload.type === 'notification' && payload.action) {
+                pushToast(payload.action);
+                notifyApp();
+                loadNotifications();
+              }
+            } catch {
+              // ignore incomplete stream frames
+            }
+          });
+        }
+      })
+      .catch(() => {});
+
+    return () => controller.abort();
   }, [user?.role]);
 
   const handleNotificationClick = () => {
-    if (user?.role === 'donor') {
-      navigate('/approvals');
-      return;
-    }
-
-    if (user?.role === 'admin') {
-      navigate('/payees');
-      return;
-    }
-
     setNotificationOpen((open) => !open);
   };
 
@@ -161,20 +205,22 @@ export default function Layout({ children }) {
                   </span>
                 )}
               </button>
-              {notificationOpen && notifications.length > 0 && (
+              {notificationOpen && (
                 <div className="absolute right-0 top-12 z-40 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notifications</p>
                   <div className="space-y-2">
-                    {notifications.map((item, index) => (
+                    {notifications.length ? notifications.map((item, index) => (
                       <NavLink
-                        key={`${item.label}-${index}`}
-                        to={item.to}
+                        key={`${item.id ?? item.label}-${index}`}
+                        to={item.to || '/dashboard'}
                         onClick={() => setNotificationOpen(false)}
                         className="block rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-brand-50 hover:text-brand-700"
                       >
                         {item.label}
                       </NavLink>
-                    ))}
+                    )) : (
+                      <p className="px-2 py-3 text-sm text-slate-500">No new notifications</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -203,20 +249,22 @@ export default function Layout({ children }) {
                   </span>
                 )}
               </button>
-              {notificationOpen && notifications.length > 0 && (
+              {notificationOpen && (
                 <div className="absolute right-0 top-11 z-40 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notifications</p>
                   <div className="space-y-2">
-                    {notifications.map((item, index) => (
+                    {notifications.length ? notifications.map((item, index) => (
                       <NavLink
-                        key={`${item.label}-${index}`}
-                        to={item.to}
+                        key={`${item.id ?? item.label}-${index}`}
+                        to={item.to || '/dashboard'}
                         onClick={() => setNotificationOpen(false)}
                         className="block rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-brand-50 hover:text-brand-700"
                       >
                         {item.label}
                       </NavLink>
-                    ))}
+                    )) : (
+                      <p className="px-2 py-3 text-sm text-slate-500">No new notifications</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -267,6 +315,15 @@ export default function Layout({ children }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {toasts.length > 0 && (
+        <div className="toast-stack">
+          {toasts.map((toast) => (
+            <div key={toast.id} className="toast-card" role="status">
+              {toast.message}
+            </div>
+          ))}
         </div>
       )}
     </div>

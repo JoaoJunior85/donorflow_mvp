@@ -159,8 +159,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   }
 
   .sidebar-logo {
-    width: 11rem;
-    height: 3.8rem;
+    width: 100%;
+    height: auto;
+    min-height: 4.4rem;
   }
 
   .activity-row {
@@ -224,9 +225,94 @@ a {
 }
 
 .sidebar-logo {
-  width: 13rem;
-  height: 4.25rem;
-  padding: 0;
+  width: 100%;
+  height: auto;
+  min-height: 4.75rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(3, 20, 35, 0.18);
+}
+
+.sidebar-logo img {
+  height: 4.1rem;
+  object-position: center;
+  filter: none;
+}
+
+.subwallet-chart {
+  width: 100%;
+  height: 320px;
+  min-height: 320px;
+}
+
+.chart-tooltip {
+  min-width: 220px;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #ffffff;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+.chart-tooltip-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.chart-tooltip-purpose {
+  margin: 0.15rem 0 0.6rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.chart-tooltip dl {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.chart-tooltip div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+
+.chart-tooltip dt {
+  color: #64748b;
+}
+
+.chart-tooltip dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.chart-tooltip-used {
+  margin: 0.6rem 0 0;
+  font-size: 0.72rem;
+  color: #047857;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 80;
+  display: grid;
+  gap: 0.6rem;
+  width: min(22rem, calc(100vw - 2rem));
+}
+
+.toast-card {
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: #0b1f33;
+  color: #fff;
+  box-shadow: 0 16px 32px rgba(11, 31, 51, 0.24);
+  animation: page-enter 220ms ease-out both;
 }
 
 .auth-logo {

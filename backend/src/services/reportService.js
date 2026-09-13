@@ -34,6 +34,21 @@ export async function getDonorDashboard(userId) {
     }) ?? []
   );
 
+  const subWalletReports = projects.flatMap((project) =>
+    project.wallet?.subWallets.map((sw) => {
+      const spent = spentBySubWallet.get(sw.id) ?? 0;
+      const allocated = Number(sw.allocatedAmount);
+      return {
+        id: sw.id,
+        name: sw.name,
+        purpose: sw.purpose,
+        allocated,
+        spent,
+        remaining: allocated - spent,
+      };
+    }) ?? []
+  );
+
   return {
     totalDonated,
     totalSpent,
@@ -45,6 +60,7 @@ export async function getDonorDashboard(userId) {
       amount: Number(t.amount),
     })),
     spendingByCategory,
+    subWalletReports,
     projects: projects.length,
   };
 }
@@ -168,14 +184,78 @@ export async function getProjectReport(projectId, userId, role) {
   }
 
   const payeeReport = Object.entries(payeeMap).map(([name, total]) => ({ name, total }));
+  const safeTotals = totals
+    ? {
+        funded: totals.funded,
+        allocated: totals.allocated,
+        spent: totals.spent,
+        remaining: totals.remaining,
+      }
+    : null;
 
   return {
     project: { id: project.id, title: project.title, totalBudget: Number(project.totalBudget) },
-    totals,
+    totals: safeTotals,
     subWalletReports,
     payeeReport,
     transactionCount: project.transactions.length,
   };
+}
+
+export async function getNotifications(userId, role) {
+  if (role === 'donor') {
+    const requests = await prisma.paymentRequest.findMany({
+      where: { project: { donorId: userId } },
+      include: {
+        payee: { select: { name: true } },
+        project: { select: { title: true } },
+        requester: { select: { fullName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    });
+
+    return requests.map((request) => ({
+      id: `pr-${request.id}-${request.status}`,
+      label: `${request.requester?.fullName ?? 'Recipient'} requested ${Number(request.amount).toLocaleString()} for ${request.purpose} (${request.status})`,
+      to: '/approvals',
+      createdAt: request.createdAt,
+      status: request.status,
+    }));
+  }
+
+  if (role === 'recipient') {
+    const requests = await prisma.paymentRequest.findMany({
+      where: { requestedBy: userId },
+      include: {
+        payee: { select: { name: true } },
+        project: { select: { title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    });
+
+    return requests.map((request) => ({
+      id: `pr-${request.id}-${request.status}`,
+      label: `${request.project?.title ?? 'Project'}: ${request.purpose} is ${request.status}`,
+      to: '/payment-requests',
+      createdAt: request.createdAt,
+      status: request.status,
+    }));
+  }
+
+  const logs = await prisma.auditLog.findMany({
+    include: { user: { select: { fullName: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 15,
+  });
+
+  return logs.map((log) => ({
+    id: log.id,
+    label: `${log.action}${log.user?.fullName ? ` · ${log.user.fullName}` : ''}`,
+    to: '/audit-logs',
+    createdAt: log.createdAt,
+  }));
 }
 
 export async function getAuditLogs(limit = 50) {

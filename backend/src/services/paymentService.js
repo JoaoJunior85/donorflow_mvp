@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { createAuditLog, generateReferenceNumber } from '../lib/utils.js';
+import { publishNotification } from '../lib/notifications.js';
 import { evaluatePaymentRequestRules, getSubWalletBalance, getSubWalletSpent } from './walletService.js';
 
 export async function createPayee(data, userId) {
@@ -118,6 +119,14 @@ export async function createPaymentRequest(recipientId, data) {
     entityType: 'payment_request',
     entityId: paymentRequest.id,
     newValue: { amount, purpose: data.purpose, flags: rules.flags },
+  });
+
+  publishNotification({
+    action: 'New payment request',
+    label: `New payment request: ${data.purpose}`,
+    entityType: 'payment_request',
+    entityId: paymentRequest.id,
+    recipientUserIds: [project.donorId],
   });
 
   return { ...paymentRequest, amount: Number(paymentRequest.amount) };
@@ -275,10 +284,22 @@ export async function processApproval(paymentRequestId, approverId, { decision, 
       updated = await completePayment(updated, request, tx);
     }
 
-    return { approval, paymentRequest: updated };
+    return {
+      approval,
+      paymentRequest: updated,
+      notification: {
+        action: actionMap[decision] ?? 'Payment request updated',
+        label: `${request.purpose} is ${updated.status}`,
+        entityType: 'payment_request',
+        entityId: paymentRequestId,
+        recipientUserIds: [request.requestedBy],
+      },
+    };
   }, { isolationLevel: 'Serializable' });
 
-  return result;
+  publishNotification(result.notification);
+  const { notification, ...response } = result;
+  return response;
 }
 
 async function completePayment(paymentRequest, fullRequest, tx = prisma) {

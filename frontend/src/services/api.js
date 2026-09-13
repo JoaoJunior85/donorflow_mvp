@@ -12,17 +12,19 @@ async function request(path, options = {}) {
   const isGet = method === 'GET';
   const token = getToken();
   const cacheKey = `${API_BASE}${path}::${token ?? 'anonymous'}`;
+  const skipCache = Boolean(options.skipCache);
+  const { skipCache: _skip, ...fetchOptions } = options;
 
-  if (isGet) {
+  if (isGet && !skipCache) {
     const cached = getCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return cached.data;
     if (pendingGets.has(cacheKey)) return pendingGets.get(cacheKey);
   }
 
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  const headers = { 'Content-Type': 'application/json', ...fetchOptions.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const fetchRequest = fetch(`${API_BASE}${path}`, { ...options, headers })
+  const fetchRequest = fetch(`${API_BASE}${path}`, { ...fetchOptions, headers })
     .then(async (res) => {
       const data = await res.json().catch(() => ({}));
 
@@ -30,9 +32,9 @@ async function request(path, options = {}) {
         throw new Error(data.error || 'Request failed');
       }
 
-      if (isGet) {
+      if (isGet && !skipCache) {
         getCache.set(cacheKey, { data, expiresAt: Date.now() + GET_CACHE_TTL });
-      } else {
+      } else if (!isGet) {
         getCache.clear();
       }
       return data;
@@ -41,13 +43,21 @@ async function request(path, options = {}) {
       if (isGet) pendingGets.delete(cacheKey);
     });
 
-  if (isGet) pendingGets.set(cacheKey, fetchRequest);
+  if (isGet && !skipCache) pendingGets.set(cacheKey, fetchRequest);
   return fetchRequest;
+}
+
+export function notifyApp() {
+  clearApiCache();
+  window.dispatchEvent(new CustomEvent('donorflow:refresh-dashboard'));
 }
 
 export function clearApiCache() {
   getCache.clear();
+  pendingGets.clear();
 }
+
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const api = {
   register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
@@ -88,8 +98,9 @@ export const api = {
     return request(`/payments/transactions${qs ? `?${qs}` : ''}`);
   },
 
-  getDashboard: () => request('/reports/dashboard'),
-  getProjectReport: (id) => request(`/reports/projects/${id}`),
+  getDashboard: (options = {}) => request('/reports/dashboard', options),
+  getProjectReport: (id, options = {}) => request(`/reports/projects/${id}`, options),
+  getNotifications: () => request('/reports/notifications', { skipCache: true }),
   getAuditLogs: () => request('/reports/audit-logs'),
   getUsers: () => request('/reports/users'),
   getOrganizations: () => request('/reports/organizations'),

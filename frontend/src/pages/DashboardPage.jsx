@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { useAuth } from '../context/AuthContext';
 import { api, formatCurrency } from '../services/api';
 import StatCard from '../components/StatCard';
+import SubWalletBarChart from '../components/SubWalletBarChart';
 import { DataTable, Icon, PageSkeleton, StatusBadge } from '../components/UI';
 
 const COLORS = ['#092d43', '#19b975', '#f2b84b', '#e86b5d', '#4b8da8'];
@@ -23,6 +24,10 @@ function DonorDashboard({ data }) {
           accent="red"
           icon="clock"
         />
+      </div>
+
+      <div className="mb-8">
+        <SubWalletBarChart data={data.subWalletReports} title="Sub-wallet allocation vs spending" />
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -194,7 +199,13 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.getDashboard().then(setData).catch((e) => setError(e.message));
+    const load = (skipCache = false) => {
+      api.getDashboard({ skipCache }).then(setData).catch((e) => setError(e.message));
+    };
+    load();
+    const refresh = () => load(true);
+    window.addEventListener('donorflow:refresh-dashboard', refresh);
+    return () => window.removeEventListener('donorflow:refresh-dashboard', refresh);
   }, []);
 
   if (error) return <p className="text-red-600">{error}</p>;
