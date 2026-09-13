@@ -312,6 +312,13 @@ a {
   min-height: 320px;
 }
 
+.chart-loading {
+  border-radius: 0.9rem;
+  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 37%, #eef2f7 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
@@ -326,6 +333,38 @@ a {
 .chart-legend-allocated { background: #0b1f33; }
 .chart-legend-spent { background: #f59e0b; }
 .chart-legend-remaining { background: #10b981; }
+
+.mobile-subwallet-bars { display: grid; gap: 0.75rem; }
+
+.mobile-subwallet-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.mobile-subwallet-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mobile-subwallet-card summary::-webkit-details-marker { display: none; }
+.mobile-subwallet-name { min-width: 0; color: #0f172a; font-size: 0.82rem; font-weight: 700; overflow-wrap: anywhere; }
+.mobile-subwallet-total { flex: 0 0 auto; color: #475569; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.mobile-bar-track { position: relative; height: 0.7rem; margin-top: 0.7rem; overflow: hidden; border-radius: 999px; background: #0b1f33; }
+.mobile-bar-track span { position: absolute; top: 0; bottom: 0; }
+.mobile-bar-spent { left: 0; background: #f59e0b; }
+.mobile-bar-remaining { background: #10b981; }
+.mobile-subwallet-values { display: none; gap: 0.45rem; margin-top: 0.75rem; color: #475569; font-size: 0.72rem; }
+.mobile-subwallet-card[open] .mobile-subwallet-values { display: grid; }
+.mobile-subwallet-values span { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.mobile-subwallet-values i { width: 0.55rem; height: 0.55rem; border-radius: 999px; }
+.mobile-subwallet-values strong { color: #0f172a; font-variant-numeric: tabular-nums; }
+.mobile-subwallet-purpose { margin: 0.6rem 0 0; color: #64748b; font-size: 0.72rem; line-height: 1.4; }
 
 .chart-tooltip {
   min-width: 220px;
@@ -854,5 +893,12 @@ form.bg-white.rounded-xl.shadow-sm,
 
   .chart-tooltip div {
     gap: 0.5rem;
+  }
+
+  .notification-popover {
+    position: fixed;
+    top: 4.6rem;
+    right: 1rem;
+    z-index: 90;
   }
 }

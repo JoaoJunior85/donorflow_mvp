@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, notifyApp } from '../services/api';
 import { Icon } from './UI';
@@ -73,7 +73,6 @@ function NotificationList({ notifications, onSelect }) {
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -109,7 +108,7 @@ export default function Layout({ children }) {
 
   useEffect(() => {
     loadNotifications();
-  }, [user?.role, location.pathname]);
+  }, [user?.role]);
 
   useEffect(() => {
     const handleRefresh = () => loadNotifications();
@@ -124,7 +123,7 @@ export default function Layout({ children }) {
           window.__donorflowLastNotification = newest.id;
         }
       });
-    }, 6000);
+    }, 30000);
     return () => {
       window.removeEventListener('donorflow:refresh-dashboard', handleRefresh);
       clearInterval(poll);
@@ -224,7 +223,7 @@ export default function Layout({ children }) {
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-auto">
-        <header className="flex items-center justify-between border-b border-slate-200/80 bg-white/80 px-4 py-4 backdrop-blur lg:hidden">
+        <header className="relative z-50 flex items-center justify-between border-b border-slate-200/80 bg-white/80 px-4 py-4 backdrop-blur lg:hidden">
           <button onClick={() => setMenuOpen(true)} className="rounded-xl p-2 text-brand-900 hover:bg-brand-50" aria-label="Open navigation">
             <Icon name="menu" size={22} />
           </button>
@@ -252,7 +251,7 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <div className="hidden border-b border-slate-200/80 bg-white/80 px-6 py-4 backdrop-blur lg:flex lg:items-center lg:justify-between">
+        <div className="relative z-50 hidden border-b border-slate-200/80 bg-white/80 px-6 py-4 backdrop-blur lg:flex lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-900/60">DonorFlow</p>
             <h2 className="text-sm font-semibold text-slate-700">Operations overview</h2>

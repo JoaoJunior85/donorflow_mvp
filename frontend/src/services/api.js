@@ -1,5 +1,5 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
-const GET_CACHE_TTL = 30_000;
+const GET_CACHE_TTL = 60_000;
 const getCache = new Map();
 const pendingGets = new Map();
 

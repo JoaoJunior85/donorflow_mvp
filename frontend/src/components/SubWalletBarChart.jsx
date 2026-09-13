@@ -1,40 +1,42 @@
-import { useEffect, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { formatCurrency } from '../services/api';
 
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0]?.payload ?? {};
-  const allocated = Number(row.allocated ?? 0);
-  const spent = Number(row.spent ?? 0);
-  const remaining = Number(row.remaining ?? allocated - spent);
-  const used = allocated > 0 ? Math.round((spent / allocated) * 100) : 0;
+const DesktopChart = lazy(() => import('./SubWalletDesktopChart'));
 
+function MobileSubWalletBars({ data }) {
   return (
-    <div className="chart-tooltip">
-      <p className="chart-tooltip-title">{label}</p>
-      {row.purpose && <p className="chart-tooltip-purpose">{row.purpose}</p>}
-      <dl>
-        <div>
-          <dt>Allocated</dt>
-          <dd>{formatCurrency(allocated)}</dd>
-        </div>
-        <div>
-          <dt>Spent to date</dt>
-          <dd>{formatCurrency(spent)}</dd>
-        </div>
-        <div>
-          <dt>Remaining</dt>
-          <dd>{formatCurrency(remaining)}</dd>
-        </div>
-      </dl>
-      <p className="chart-tooltip-used">{used}% of this sub-wallet has been used</p>
+    <div className="mobile-subwallet-bars">
+      {data.map((item) => {
+        const allocated = Math.max(0, item.allocated);
+        const spent = Math.min(allocated, Math.max(0, item.spent));
+        const remaining = Math.min(allocated - spent, Math.max(0, item.remaining));
+        const spentPercent = allocated ? (spent / allocated) * 100 : 0;
+        const remainingPercent = allocated ? (remaining / allocated) * 100 : 0;
+        return (
+          <details key={item.id ?? item.name} className="mobile-subwallet-card">
+            <summary>
+              <span className="mobile-subwallet-name">{item.name}</span>
+              <span className="mobile-subwallet-total">{formatCurrency(allocated)}</span>
+            </summary>
+            <div className="mobile-bar-track" aria-label={`${item.name}: ${formatCurrency(spent)} spent from ${formatCurrency(allocated)}`}>
+              <span className="mobile-bar-spent" style={{ width: `${spentPercent}%` }} />
+              <span className="mobile-bar-remaining" style={{ left: `${spentPercent}%`, width: `${remainingPercent}%` }} />
+            </div>
+            <div className="mobile-subwallet-values">
+              <span><i className="chart-legend-allocated" />Allocated <strong>{formatCurrency(allocated)}</strong></span>
+              <span><i className="chart-legend-spent" />Spent <strong>{formatCurrency(spent)}</strong></span>
+              <span><i className="chart-legend-remaining" />Remaining <strong>{formatCurrency(remaining)}</strong></span>
+            </div>
+            {item.purpose && <p className="mobile-subwallet-purpose">{item.purpose}</p>}
+          </details>
+        );
+      })}
     </div>
   );
 }
 
 export default function SubWalletBarChart({ data = [], title = 'Sub-wallet allocation vs spending' }) {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 639px)').matches);
   const chartData = (Array.isArray(data) ? data : []).map((item) => ({
     ...item,
     name: item.name?.replace(/\s+Wallet$/i, '') ?? item.name,
@@ -75,28 +77,7 @@ export default function SubWalletBarChart({ data = [], title = 'Sub-wallet alloc
         <span><i className="chart-legend-spent" />Spent</span>
         <span><i className="chart-legend-remaining" />Remaining</span>
       </div>
-      <div className={`subwallet-chart${isMobile ? ' subwallet-chart-mobile' : ''}`} style={isMobile ? { height: `${Math.max(300, chartData.length * 92)}px` } : undefined}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
-          <BarChart layout={isMobile ? 'vertical' : 'horizontal'} data={chartData} margin={isMobile ? { top: 8, right: 8, left: 2, bottom: 8 } : { top: 8, right: 8, left: 4, bottom: 8 }} barGap={4} barCategoryGap="18%">
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={isMobile} horizontal={!isMobile} />
-            {isMobile ? (
-              <>
-                <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(value) => formatCurrency(value)} />
-                <YAxis dataKey="name" type="category" width={116} tick={{ fontSize: 10, fill: '#475569' }} tickFormatter={(name) => String(name).length > 16 ? `${String(name).slice(0, 16)}…` : name} />
-              </>
-            ) : (
-              <>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} interval={0} height={48} tickFormatter={(name) => String(name).length > 18 ? `${String(name).slice(0, 18)}…` : name} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(value) => formatCurrency(value)} width={78} />
-              </>
-            )}
-            <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }} />
-            <Bar dataKey="allocated" name="Allocated" fill="#0b1f33" radius={isMobile ? [0, 6, 6, 0] : [6, 6, 0, 0]} maxBarSize={28} />
-            <Bar dataKey="spent" name="Spent" fill="#f59e0b" radius={isMobile ? [0, 6, 6, 0] : [6, 6, 0, 0]} maxBarSize={28} />
-            <Bar dataKey="remaining" name="Remaining" fill="#10b981" radius={isMobile ? [0, 6, 6, 0] : [6, 6, 0, 0]} maxBarSize={28} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {isMobile ? <MobileSubWalletBars data={chartData} /> : <Suspense fallback={<div className="subwallet-chart chart-loading" /> }><DesktopChart data={chartData} /></Suspense>}
     </div>
   );
 }
