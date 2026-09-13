@@ -12,14 +12,14 @@ export default function PaymentRequestsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">My Payment Requests</h1>
           <p className="text-slate-500">Track status of submitted requests</p>
         </div>
         <Link
           to="/payment-requests/new"
-          className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700"
+          className="self-start rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
           New Request
         </Link>

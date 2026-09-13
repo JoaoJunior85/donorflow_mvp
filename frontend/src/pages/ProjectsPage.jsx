@@ -52,7 +52,7 @@ export default function ProjectsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Projects</h1>
           <p className="text-slate-500">Track funded programmes and sub-wallets</p>
@@ -60,7 +60,7 @@ export default function ProjectsPage() {
         {user.role === 'donor' && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700"
+            className="self-start rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
             {showForm ? 'Cancel' : 'New Project'}
           </button>

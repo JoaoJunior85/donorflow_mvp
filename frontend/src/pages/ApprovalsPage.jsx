@@ -83,7 +83,7 @@ export default function ApprovalsPage() {
         </div>
 
         {selected && (
-          <div className="bg-white rounded-xl shadow-sm p-6 h-fit sticky top-8">
+          <div className="h-fit rounded-xl bg-white p-4 shadow-sm sm:p-6 lg:sticky lg:top-8">
             <h2 className="font-semibold text-lg mb-4">Request Details</h2>
             <dl className="space-y-3 text-sm">
               <div>

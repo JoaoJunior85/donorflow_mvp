@@ -38,7 +38,7 @@ export default function PayeesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Payees & Vendors</h1>
           <p className="text-slate-500">Suppliers and payment recipients</p>

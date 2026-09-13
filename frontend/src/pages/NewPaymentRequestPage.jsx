@@ -57,7 +57,7 @@ export default function NewPaymentRequestPage() {
       {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
       {success && <SuccessBanner title="Success" message={success} onClose={() => setSuccess('')} />}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-white p-4 shadow-sm sm:p-6">
         <div>
           <label className="block text-sm font-medium mb-1">Project</label>
           <select
