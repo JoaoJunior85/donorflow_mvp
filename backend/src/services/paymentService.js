@@ -2,12 +2,17 @@ import prisma from '../lib/prisma.js';
 import { createAuditLog, generateReferenceNumber } from '../lib/utils.js';
 import { publishNotification } from '../lib/notifications.js';
 import { evaluatePaymentRequestRules, getSubWalletBalance, getSubWalletSpent } from './walletService.js';
+import { money, optionalText, requiredText } from '../lib/validation.js';
 
 export async function createPayee(data, userId) {
+  const name = requiredText(data.name, 'Payee name', 200);
+  const type = requiredText(data.type, 'Payee type', 100);
   const payee = await prisma.payee.create({
     data: {
       ...data,
-      serviceProvided: data.serviceProvided?.trim() || null,
+      name,
+      type,
+      serviceProvided: optionalText(data.serviceProvided, 'Service provided', 255),
     },
   });
 
@@ -44,12 +49,9 @@ export async function verifyPayee(payeeId, status, adminId) {
 }
 
 export async function createPaymentRequest(recipientId, data) {
-  const amount = Number(data.amount);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    const err = new Error('Payment amount must be a finite positive number');
-    err.status = 400;
-    throw err;
-  }
+  const amount = money(data.amount, 'Payment amount');
+  const purpose = requiredText(data.purpose, 'Payment purpose', 255);
+  const description = optionalText(data.description, 'Payment description', 5000);
 
   const project = await prisma.project.findFirst({
     where: { id: data.projectId, recipientId },
@@ -101,8 +103,8 @@ export async function createPaymentRequest(recipientId, data) {
       requestedBy: recipientId,
       payeeId: data.payeeId,
       amount,
-      purpose: data.purpose,
-      description: data.description,
+      purpose,
+      description,
       invoiceUrl: data.invoiceUrl,
       status: 'pending',
     },
@@ -118,12 +120,12 @@ export async function createPaymentRequest(recipientId, data) {
     action: 'Payment request submitted',
     entityType: 'payment_request',
     entityId: paymentRequest.id,
-    newValue: { amount, purpose: data.purpose, flags: rules.flags },
+    newValue: { amount, purpose, flags: rules.flags },
   });
 
   publishNotification({
     action: 'New payment request',
-    label: `New payment request: ${data.purpose}`,
+    label: `New payment request: ${purpose}`,
     entityType: 'payment_request',
     entityId: paymentRequest.id,
     recipientUserIds: [project.donorId],

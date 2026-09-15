@@ -31,7 +31,7 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-router.post('/', authorize('donor', 'admin'), async (req, res, next) => {
+router.post('/', authorize('donor'), async (req, res, next) => {
   try {
     const project = await createProject(req.user.id, req.body);
     res.status(201).json(project);

@@ -91,6 +91,17 @@ app.use('/api/reports', reportRoutes);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`DonorFlow API running on http://localhost:${PORT}`);
+async function startServer() {
+  const administratorCount = await prisma.user.count({ where: { role: 'admin' } });
+  if (administratorCount > 1) {
+    throw new Error('Database integrity error: only one administrator account is permitted');
+  }
+  app.listen(PORT, () => {
+    console.log(`DonorFlow API running on http://localhost:${PORT}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('Unable to start DonorFlow API', error);
+  process.exit(1);
 });

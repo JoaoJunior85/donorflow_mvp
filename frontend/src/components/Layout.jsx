@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, notifyApp } from '../services/api';
@@ -34,36 +34,79 @@ function notificationTime(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const diffMs = Date.now() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDays = Math.floor(diffHr / 24);
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function NotificationList({ notifications, onSelect }) {
+function NotificationList({ notifications, readIds, onMarkAllAsRead, onSelect }) {
+  const unreadInList = notifications.filter((item) => item.id && !readIds.includes(item.id)).length;
+
   return (
-    <div className="notification-popover" role="dialog" aria-label="Recent notifications">
-      <div className="notification-popover-heading">
+    <div className="notification-popover shadow-2xl border border-slate-200" role="dialog" aria-label="Recent notifications">
+      <div className="notification-popover-heading flex items-center justify-between border-b border-slate-100 bg-slate-50/75 p-3.5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Notifications</p>
-          <p className="mt-1 text-sm font-semibold text-slate-800">Recent request activity</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Notifications</p>
+          <p className="mt-0.5 text-xs font-semibold text-slate-800">
+            {unreadInList > 0 ? `${unreadInList} new activity` : 'All caught up'}
+          </p>
         </div>
-        {notifications.length > 0 && <span className="notification-total">{notifications.length}</span>}
+        <div className="flex items-center gap-2">
+          {unreadInList > 0 && (
+            <button
+              onClick={onMarkAllAsRead}
+              className="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline cursor-pointer"
+              type="button"
+            >
+              Mark all read
+            </button>
+          )}
+          {notifications.length > 0 && <span className="notification-total">{notifications.length}</span>}
+        </div>
       </div>
-      <div className="notification-list">
-        {notifications.length ? notifications.map((item, index) => (
-          <NavLink
-            key={`${item.id ?? item.label}-${index}`}
-            to={item.to || '/dashboard'}
-            onClick={onSelect}
-            className="notification-item"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-slate-800">{item.title ?? 'Payment request update'}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{item.label}</p>
-              <p className="mt-2 text-[11px] text-slate-400">{notificationTime(item.createdAt)}</p>
-            </div>
-            {item.status && <span className={`notification-status notification-status-${item.status}`}>{item.status.replaceAll('_', ' ')}</span>}
-          </NavLink>
-        )) : (
-          <p className="px-2 py-4 text-center text-sm text-slate-500">No recent request activity</p>
+      <div className="notification-list max-h-80 overflow-y-auto divide-y divide-slate-100">
+        {notifications.length ? (
+          notifications.map((item, index) => {
+            const isUnread = item.id && !readIds.includes(item.id);
+            return (
+              <NavLink
+                key={`${item.id ?? item.label}-${index}`}
+                to={item.to || '/dashboard'}
+                onClick={() => onSelect(item)}
+                className={`notification-item block p-3 transition-colors hover:bg-slate-50 ${isUnread ? 'bg-emerald-50/50 font-medium' : ''}`}
+              >
+                <div className="flex items-start gap-2">
+                  {isUnread ? (
+                    <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-emerald-500 ring-2 ring-emerald-200" title="Unread" />
+                  ) : (
+                    <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-slate-200" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="truncate text-xs font-bold text-slate-800">{item.title ?? 'Payment update'}</p>
+                      {item.status && (
+                        <span className={`notification-status notification-status-${item.status} text-[10px]`}>
+                          {item.status.replaceAll('_', ' ')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-slate-600">{item.label}</p>
+                    <p className="mt-1 text-[10px] text-slate-400">{notificationTime(item.createdAt)}</p>
+                  </div>
+                </div>
+              </NavLink>
+            );
+          })
+        ) : (
+          <p className="px-3 py-6 text-center text-xs text-slate-500">No recent request activity</p>
         )}
       </div>
     </div>
@@ -79,6 +122,48 @@ export default function Layout({ children }) {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const links = navByRole[user?.role] ?? [];
+
+  const desktopBellRef = useRef(null);
+  const mobileBellRef = useRef(null);
+
+  const readStorageKey = user?.id ? `donorflow_read_notifications_${user.id}` : null;
+  const [readIds, setReadIds] = useState(() => {
+    if (!readStorageKey) return [];
+    try {
+      return JSON.parse(localStorage.getItem(readStorageKey) || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const unreadCount = notifications.filter((item) => item.id && !readIds.includes(item.id)).length;
+
+  const markAllAsRead = () => {
+    const allIds = notifications.map((item) => item.id).filter(Boolean);
+    setReadIds(allIds);
+    if (readStorageKey) {
+      try {
+        localStorage.setItem(readStorageKey, JSON.stringify(allIds));
+      } catch {
+        // ignore storage errors
+      }
+    }
+  };
+
+  const handleNotificationSelect = (item) => {
+    if (item?.id && !readIds.includes(item.id)) {
+      const nextRead = [...readIds, item.id];
+      setReadIds(nextRead);
+      if (readStorageKey) {
+        try {
+          localStorage.setItem(readStorageKey, JSON.stringify(nextRead));
+        } catch {
+          // ignore storage errors
+        }
+      }
+    }
+    setNotificationOpen(false);
+  };
 
   const pushToast = (message) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -173,6 +258,34 @@ export default function Layout({ children }) {
     return () => controller.abort();
   }, [user?.role]);
 
+  useEffect(() => {
+    if (!notificationOpen) return undefined;
+
+    const handlePointerDown = (e) => {
+      const inDesktop = desktopBellRef.current && desktopBellRef.current.contains(e.target);
+      const inMobile = mobileBellRef.current && mobileBellRef.current.contains(e.target);
+      if (!inDesktop && !inMobile) {
+        setNotificationOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setNotificationOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [notificationOpen]);
+
   const handleNotificationClick = () => {
     setNotificationOpen((open) => !open);
   };
@@ -229,22 +342,27 @@ export default function Layout({ children }) {
           </button>
           <div className="brand-logo dashboard-logo mobile-logo"><img src={mobileLogo} alt="DonorFlow" /></div>
           <div className="flex items-center gap-3">
-            <div className="relative">
+            <div className="relative" ref={mobileBellRef}>
               <button
                 className="notification-button relative"
-                aria-label={notifications.length ? `${notifications.length} notifications` : 'No notifications'}
+                aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
                 title="Notifications"
                 onClick={handleNotificationClick}
               >
                 <Icon name="bell" size={20} />
-                {notifications.length > 0 && (
-                  <span className="notification-count" aria-label={`${notifications.length} notifications`}>
-                    {notifications.length}
+                {unreadCount > 0 && (
+                  <span className="notification-count" aria-label={`${unreadCount} unread`}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </button>
               {notificationOpen && (
-                <NotificationList notifications={notifications} onSelect={() => setNotificationOpen(false)} />
+                <NotificationList
+                  notifications={notifications}
+                  readIds={readIds}
+                  onMarkAllAsRead={markAllAsRead}
+                  onSelect={handleNotificationSelect}
+                />
               )}
             </div>
             <div className="user-avatar user-avatar-mobile" aria-label="User profile"><Icon name="user" size={23} /></div>
@@ -257,22 +375,27 @@ export default function Layout({ children }) {
             <h2 className="text-sm font-semibold text-slate-700">Operations overview</h2>
           </div>
           <div className="flex items-center gap-3">
-            <div className="relative">
+            <div className="relative" ref={desktopBellRef}>
               <button
                 className="notification-button relative"
-                aria-label={notifications.length ? `${notifications.length} notifications` : 'No notifications'}
+                aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
                 title="Notifications"
                 onClick={handleNotificationClick}
               >
                 <Icon name="bell" size={18} />
-                {notifications.length > 0 && (
-                  <span className="notification-count" aria-label={`${notifications.length} notifications`}>
-                    {notifications.length}
+                {unreadCount > 0 && (
+                  <span className="notification-count" aria-label={`${unreadCount} unread`}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </button>
               {notificationOpen && (
-                <NotificationList notifications={notifications} onSelect={() => setNotificationOpen(false)} />
+                <NotificationList
+                  notifications={notifications}
+                  readIds={readIds}
+                  onMarkAllAsRead={markAllAsRead}
+                  onSelect={handleNotificationSelect}
+                />
               )}
             </div>
             <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">

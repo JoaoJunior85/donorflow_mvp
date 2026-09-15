@@ -10,7 +10,7 @@ export async function getDonorDashboard(userId) {
   const subWalletIds = projects.flatMap((project) => project.wallet?.subWallets.map((sw) => sw.id) ?? []);
   const [walletTotals, pendingApprovals, spentBySubWallet] = await Promise.all([
     Promise.all(projects.filter((project) => project.wallet).map((project) => getWalletTotalsForSubWallets(project.wallet.id, project.wallet.subWallets))),
-    prisma.paymentRequest.count({ where: { project: { donorId: userId }, status: 'pending' } }),
+    prisma.paymentRequest.count({ where: { project: { donorId: userId }, status: { in: ['pending', 'frozen'] } } }),
     getSubWalletSpentByIds(subWalletIds),
   ]);
   const totalDonated = walletTotals.reduce((sum, totals) => sum + totals.funded, 0);
@@ -223,7 +223,7 @@ export async function getNotifications(userId, role) {
       to: '/approvals',
       createdAt: request.approvals[0]?.createdAt ?? request.createdAt,
       status: request.status,
-    }));
+    })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
   if (role === 'recipient') {
@@ -251,7 +251,7 @@ export async function getNotifications(userId, role) {
       to: '/payment-requests',
       createdAt: request.approvals[0]?.createdAt ?? request.createdAt,
       status: request.status,
-    }));
+    })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
   const logs = await prisma.auditLog.findMany({

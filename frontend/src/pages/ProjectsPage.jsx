@@ -33,11 +33,26 @@ export default function ProjectsPage() {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    const budget = Number(form.totalBudget);
+    if (!budget || budget <= 0) {
+      setError('Total budget must be a positive number.');
+      return;
+    }
+
+    if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate)) {
+      setError('Project end date cannot be earlier than start date.');
+      return;
+    }
+
     try {
       await api.createProject({
-        ...form,
-        totalBudget: Number(form.totalBudget),
+        title: form.title.trim(),
+        description: form.description?.trim() || undefined,
+        totalBudget: budget,
         recipientId: form.recipientId || undefined,
+        startDate: form.startDate || undefined,
+        endDate: form.endDate || undefined,
       });
       setShowForm(false);
       setForm({ title: '', description: '', totalBudget: '', recipientId: '', startDate: '', endDate: '' });
@@ -60,7 +75,7 @@ export default function ProjectsPage() {
         {user.role === 'donor' && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="self-start rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+            className="self-start rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 cursor-pointer"
           >
             {showForm ? 'Cancel' : 'New Project'}
           </button>
@@ -79,43 +94,78 @@ export default function ProjectsPage() {
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <input
-              placeholder="Project title"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
-              required
-            />
-            <input
-              placeholder="Total budget (USD)"
-              type="number"
-              value={form.totalBudget}
-              onChange={(e) => setForm({ ...form, totalBudget: e.target.value })}
-              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
-              required
-            />
-            <textarea
-              placeholder="Description"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white md:col-span-2"
-              rows={3}
-            />
-            <select
-              value={form.recipientId}
-              onChange={(e) => setForm({ ...form, recipientId: e.target.value })}
-              className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
-            >
-              <option value="">Select recipient (optional)</option>
-              {recipients.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.fullName} ({r.email})
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Project Title *</label>
+              <input
+                placeholder="e.g. Digital Skills Training"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Total Budget (USD) *</label>
+              <input
+                placeholder="e.g. 100000"
+                type="number"
+                step="0.01"
+                min="1"
+                value={form.totalBudget}
+                onChange={(e) => setForm({ ...form, totalBudget: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
+                required
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Project Description</label>
+              <textarea
+                placeholder="Provide details on project goals, targets and location..."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Assigned Recipient (optional)</label>
+              <select
+                value={form.recipientId}
+                onChange={(e) => setForm({ ...form, recipientId: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:bg-white"
+              >
+                <option value="">Select recipient</option>
+                {recipients.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.fullName} ({r.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">End Date</label>
+                <input
+                  type="date"
+                  min={form.startDate}
+                  value={form.endDate}
+                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:bg-white"
+                />
+              </div>
+            </div>
           </div>
           <div className="mt-5 flex justify-end">
-            <button type="submit" className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700">
+            <button type="submit" className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 cursor-pointer">
               Create Project
             </button>
           </div>

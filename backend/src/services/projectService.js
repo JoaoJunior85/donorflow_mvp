@@ -1,18 +1,48 @@
 import prisma from '../lib/prisma.js';
 import { createAuditLog } from '../lib/utils.js';
+import { publishNotification } from '../lib/notifications.js';
 import { getWalletTotalsForSubWallets } from './walletService.js';
+import { money, optionalDate, optionalText, requiredText } from '../lib/validation.js';
+
+async function inSerializableTransaction(work) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await prisma.$transaction(work, { isolationLevel: 'Serializable' });
+    } catch (error) {
+      if (error.code !== 'P2034' || attempt === 2) throw error;
+    }
+  }
+}
 
 export async function createProject(donorId, data) {
+  const title = requiredText(data.title, 'Project title', 200);
+  const description = optionalText(data.description, 'Project description', 5000);
+  const totalBudget = money(data.totalBudget, 'Total budget');
+  const startDate = optionalDate(data.startDate, 'Start date');
+  const endDate = optionalDate(data.endDate, 'End date');
+  if (startDate && endDate && endDate < startDate) {
+    const error = new Error('End date cannot be before start date');
+    error.status = 400;
+    throw error;
+  }
+  if (data.recipientId) {
+    const recipient = await prisma.user.findFirst({ where: { id: data.recipientId, role: 'recipient' } });
+    if (!recipient) {
+      const error = new Error('Selected recipient is invalid');
+      error.status = 400;
+      throw error;
+    }
+  }
   const project = await prisma.project.create({
     data: {
-      title: data.title,
-      description: data.description,
+      title,
+      description,
       donorId,
       recipientId: data.recipientId || null,
-      totalBudget: data.totalBudget,
-      status: data.status ?? 'draft',
-      startDate: data.startDate ? new Date(data.startDate) : null,
-      endDate: data.endDate ? new Date(data.endDate) : null,
+      totalBudget,
+      status: 'draft',
+      startDate,
+      endDate,
     },
     include: {
       donor: { select: { id: true, fullName: true, email: true } },
@@ -32,88 +62,50 @@ export async function createProject(donorId, data) {
 }
 
 export async function fundProject(projectId, donorId, amount) {
-  const fundingAmount = Number(amount);
-  if (!Number.isFinite(fundingAmount) || fundingAmount <= 0) {
-    const err = new Error('Funding amount must be a finite positive number');
-    err.status = 400;
-    throw err;
-  }
-
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, donorId },
-    include: { wallet: true },
+  const fundingAmount = money(amount, 'Funding amount');
+  const result = await inSerializableTransaction(async (tx) => {
+    const project = await tx.project.findFirst({ where: { id: projectId, donorId }, include: { wallet: true } });
+    if (!project) {
+      const error = new Error('Project not found');
+      error.status = 404;
+      throw error;
+    }
+    const fundedAmount = project.wallet
+      ? Number((await tx.ledgerEntry.aggregate({ where: { walletId: project.wallet.id, entryType: 'credit', subWalletId: null }, _sum: { amount: true } }))._sum.amount ?? 0)
+      : 0;
+    const remainingBudget = Number(project.totalBudget) - fundedAmount;
+    if (fundingAmount > remainingBudget) {
+      const error = new Error(`Funding exceeds the project budget. Maximum fundable amount is ${remainingBudget.toFixed(2)}.`);
+      error.status = 400;
+      throw error;
+    }
+    const wallet = project.wallet ?? await tx.wallet.create({ data: { projectId, donorId, recipientId: project.recipientId, currency: 'USD' } });
+    await tx.ledgerEntry.create({ data: { walletId: wallet.id, entryType: 'credit', amount: fundingAmount, currency: wallet.currency, description: `Project funding: ${project.title}` } });
+    await tx.project.update({ where: { id: projectId }, data: { status: 'active' } });
+    await createAuditLog({ userId: donorId, action: 'Wallet funded', entityType: 'wallet', entityId: wallet.id, newValue: { amount: fundingAmount, projectId } }, tx);
+    return { wallet, amount: fundingAmount, project };
   });
 
-  if (!project) {
-    const err = new Error('Project not found');
-    err.status = 404;
-    throw err;
-  }
-
-  const fundedAmount = project.wallet
-    ? Number(
-        (await prisma.ledgerEntry.aggregate({
-          where: { walletId: project.wallet.id, entryType: 'credit', subWalletId: null },
-          _sum: { amount: true },
-        }))._sum.amount ?? 0
-      )
-    : 0;
-  if (fundedAmount + fundingAmount > Number(project.totalBudget)) {
-    const err = new Error('Funding exceeds the project budget');
-    err.status = 400;
-    throw err;
-  }
-
-  let wallet = project.wallet;
-  if (!wallet) {
-    wallet = await prisma.wallet.create({
-      data: {
-        projectId,
-        donorId,
-        recipientId: project.recipientId,
-        currency: 'USD',
-      },
+  if (result.project.recipientId) {
+    publishNotification({
+      action: 'Project funded',
+      label: `Project funded: ${result.project.title} received ${result.wallet.currency} ${fundingAmount.toLocaleString()}`,
+      entityType: 'wallet',
+      entityId: result.wallet.id,
+      recipientUserIds: [result.project.recipientId],
     });
   }
 
-  await prisma.ledgerEntry.create({
-    data: {
-      walletId: wallet.id,
-      entryType: 'credit',
-      amount: fundingAmount,
-      currency: wallet.currency,
-      description: `Project funding: ${project.title}`,
-    },
-  });
-
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { status: 'active' },
-  });
-
-  await createAuditLog({
-    userId: donorId,
-    action: 'Wallet funded',
-    entityType: 'wallet',
-    entityId: wallet.id,
-    newValue: { amount: fundingAmount, projectId },
-  });
-
-  return { wallet, amount: fundingAmount };
+  return { wallet: result.wallet, amount: result.amount };
 }
 
 export async function createSubWallet(projectId, donorId, data) {
-  const requestedAllocation = Number(data.allocatedAmount);
-  const approvalLimit = data.approvalLimit === undefined || data.approvalLimit === null || data.approvalLimit === ''
-    ? 0
-    : Number(data.approvalLimit);
-  if (!Number.isFinite(requestedAllocation) || requestedAllocation <= 0) {
-    const err = new Error('Sub-wallet allocation must be a finite positive number');
-    err.status = 400;
-    throw err;
-  }
-  if (!Number.isFinite(approvalLimit) || approvalLimit < 0) {
-    const err = new Error('Approval limit must be zero or a positive number');
+  const name = requiredText(data.name, 'Sub-wallet name', 150);
+  const purpose = requiredText(data.purpose, 'Sub-wallet purpose', 255);
+  const requestedAllocation = money(data.allocatedAmount, 'Sub-wallet allocation');
+  const approvalLimit = data.approvalLimit === undefined || data.approvalLimit === null || data.approvalLimit === '' ? 0 : money(data.approvalLimit, 'Approval limit', { allowZero: true });
+  if (approvalLimit > requestedAllocation) {
+    const err = new Error('Approval limit cannot exceed the sub-wallet allocation');
     err.status = 400;
     throw err;
   }
@@ -156,8 +148,8 @@ export async function createSubWallet(projectId, donorId, data) {
   const subWallet = await prisma.subWallet.create({
     data: {
       walletId: project.wallet.id,
-      name: data.name,
-      purpose: data.purpose,
+      name,
+      purpose,
       allocatedAmount: requestedAllocation,
       approvalLimit,
     },
@@ -170,6 +162,16 @@ export async function createSubWallet(projectId, donorId, data) {
     entityId: subWallet.id,
     newValue: { name: subWallet.name, allocatedAmount: Number(subWallet.allocatedAmount) },
   });
+
+  if (project.recipientId) {
+    publishNotification({
+      action: 'New sub-wallet created',
+      label: `Sub-wallet created: ${name} (${project.wallet.currency || 'USD'} ${requestedAllocation.toLocaleString()}) for ${project.title}`,
+      entityType: 'sub_wallet',
+      entityId: subWallet.id,
+      recipientUserIds: [project.recipientId],
+    });
+  }
 
   return subWallet;
 }
@@ -285,6 +287,15 @@ export async function getProjectById(projectId, userId, role) {
 }
 
 export async function assignRecipient(projectId, donorId, recipientId) {
+  const recipient = await prisma.user.findFirst({
+    where: { id: recipientId, role: 'recipient' },
+  });
+  if (!recipient) {
+    const error = new Error('Selected recipient user is invalid');
+    error.status = 400;
+    throw error;
+  }
+
   const project = await prisma.project.update({
     where: { id: projectId, donorId },
     data: { recipientId },
@@ -305,6 +316,14 @@ export async function assignRecipient(projectId, donorId, recipientId) {
     entityType: 'project',
     entityId: projectId,
     newValue: { recipientId },
+  });
+
+  publishNotification({
+    action: 'Assigned to project',
+    label: `You were assigned as recipient for project: ${project.title}`,
+    entityType: 'project',
+    entityId: projectId,
+    recipientUserIds: [recipientId],
   });
 
   return project;

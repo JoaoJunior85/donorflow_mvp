@@ -4,6 +4,14 @@ import { signToken } from '../lib/auth.js';
 import { createAuditLog } from '../lib/utils.js';
 
 export async function registerUser({ fullName, email, phone, password, role }) {
+  if (role === 'admin') {
+    const adminExists = await prisma.user.count({ where: { role: 'admin' } });
+    if (adminExists > 0) {
+      const err = new Error('Only one administrator account is permitted');
+      err.status = 409;
+      throw err;
+    }
+  }
   const existing = await prisma.user.findFirst({ where: { email } });
   if (existing) {
     const err = new Error('Email already registered');

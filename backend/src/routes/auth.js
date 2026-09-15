@@ -13,6 +13,9 @@ router.post('/register', async (req, res, next) => {
     if (!fullName || !email || !password || !role) {
       return res.status(400).json({ error: 'fullName, email, password, and role are required' });
     }
+    if (fullName.length > 150 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 255) {
+      return res.status(400).json({ error: 'Enter a valid name and email address' });
+    }
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
